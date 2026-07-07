@@ -114,6 +114,8 @@
       <button type="button" data-key="4" aria-label="Flee">&#128168; Run</button>
       <button type="button" data-key="h" aria-label="Drink potion">&#129380; Pot</button>
       <button type="button" data-key="r" aria-label="Reroll stats">&#127922; Roll</button>
+      <button type="button" data-key="p" aria-label="Save game">&#128190; Sav</button>
+      <button type="button" data-key="l" aria-label="Load game">&#128194; Lod</button>
       <button type="button" data-key="Enter" aria-label="Confirm">&#9166; OK</button>
     </div>
   </div>
@@ -132,7 +134,7 @@
       <div id="log" aria-live="polite"></div>
     </div>
     <div class="panel" id="controls">
-      <kbd>&#8592;&#8594;</kbd> walk &middot; <kbd>&#8593;&#8595;</kbd> climb &middot; <kbd>1-4</kbd> combat actions &middot; <kbd>Enter</kbd> confirm &middot; <kbd>H</kbd> drink potion
+      <kbd>&#8592;&#8594;</kbd> walk &middot; <kbd>&#8593;&#8595;</kbd> climb &middot; <kbd>1-4</kbd> combat actions &middot; <kbd>Enter</kbd> confirm &middot; <kbd>H</kbd> drink potion &middot; <kbd>P</kbd> save &middot; <kbd>L</kbd> load
     </div>
   </div>
 </div>
@@ -864,6 +866,61 @@ function enterDungeon(depth) {
   log(`You descend into Dungeon Level ${depth}...`, "sys");
 }
 
+// ---------- Save / Load ----------
+// Persists the full game state to localStorage so progress survives page
+// reloads on both desktop (P/L keys) and mobile (Sav/Lod buttons).
+const SAVE_KEY = "pixelfunz-save-v1";
+function saveGame() {
+  if (G.mode !== "explore" || !G.player) {
+    log("You can only save while exploring.", "sys");
+    return;
+  }
+  saveOverworld();
+  const data = {
+    seed: G.seed,
+    area: G.area,
+    dungeonLevel: G.dungeonLevel,
+    px: G.px, py: G.py,
+    face: G.face,
+    map: G.map,
+    entities: G.entities,
+    overworldState: G.overworldState,
+    player: G.player,
+  };
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+    log("Game saved.", "good");
+  } catch (err) {
+    log("Save failed: storage unavailable.", "dmg");
+  }
+}
+function loadGame() {
+  let data;
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) { log("No saved game found.", "sys"); return; }
+    data = JSON.parse(raw);
+  } catch (err) {
+    log("Load failed: save data unreadable.", "dmg");
+    return;
+  }
+  if (!data || !data.player || !data.map) { log("Load failed: save data invalid.", "dmg"); return; }
+  G.seed = data.seed;
+  G.area = data.area;
+  G.dungeonLevel = data.dungeonLevel;
+  G.px = data.px; G.py = data.py;
+  G.face = data.face || 1;
+  G.map = data.map;
+  G.entities = data.entities;
+  G.overworldState = data.overworldState;
+  G.player = data.player;
+  G.combat = null;
+  G.moveAnim = null;
+  G.mode = "explore";
+  log("Game loaded.", "good");
+  updateHUD();
+}
+
 // ---------- Combat ----------
 function startCombat(monsterType, entRef) {
   const M = MONSTERS[monsterType];
@@ -1274,6 +1331,7 @@ function renderTitle() {
   drawText("PIXELFUNZ", cv.width / 2, 280, 44, "#a08048", "center");
   drawText("A D&D-Style Pixel Adventure", cv.width / 2, 312, 16, "#7a6f90", "center");
   if ((G.tick >> 4) % 2) drawText("— Press Enter to begin —", cv.width / 2, 380, 18, "#b8b0a0", "center");
+  drawText("L: load saved game", cv.width / 2, 408, 13, "#7a6f90", "center");
   drawText("Slay the dragon in Dungeon 3 to win!", cv.width / 2, 430, 13, "#6a6050", "center");
 }
 
@@ -1432,6 +1490,7 @@ function beginAdventure() {
 function handleInput(k) {
   if (G.mode === "title") {
     if (k === "Enter") startCreation();
+    if (k === "l" || k === "L") loadGame();
     return;
   }
   if (G.mode === "create") {
@@ -1447,6 +1506,7 @@ function handleInput(k) {
   }
   if (G.mode === "gameover" || G.mode === "victory") {
     if (k === "Enter") { G.mode = "title"; }
+    if (k === "l" || k === "L") loadGame();
     return;
   }
   if (G.mode === "combat") {
@@ -1462,6 +1522,8 @@ function handleInput(k) {
     else if (k === "ArrowDown" || k === "s") tryMove(0, 1);
     else if (k === "ArrowLeft" || k === "a") tryMove(-1, 0);
     else if (k === "ArrowRight" || k === "d") tryMove(1, 0);
+    else if (k === "p" || k === "P") saveGame();
+    else if (k === "l" || k === "L") loadGame();
     else if (k === "h" || k === "H") {
       const p = G.player;
       if (p.potions > 0 && p.hp < p.hpMax) {
