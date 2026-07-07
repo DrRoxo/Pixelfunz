@@ -102,10 +102,10 @@
   <canvas id="c" width="480" height="480" tabindex="0"></canvas>
   <div id="touch-controls" aria-label="Touch controls">
     <div id="dpad">
-      <button type="button" data-key="ArrowUp" aria-label="Move up" style="grid-area: up;">&#9650;</button>
+      <button type="button" data-key="ArrowUp" aria-label="Climb up" style="grid-area: up;">&#9650;</button>
       <button type="button" data-key="ArrowLeft" aria-label="Move left" style="grid-area: left;">&#9664;</button>
       <button type="button" data-key="ArrowRight" aria-label="Move right" style="grid-area: right;">&#9654;</button>
-      <button type="button" data-key="ArrowDown" aria-label="Move down" style="grid-area: down;">&#9660;</button>
+      <button type="button" data-key="ArrowDown" aria-label="Climb down" style="grid-area: down;">&#9660;</button>
     </div>
     <div id="action-buttons">
       <button type="button" data-key="1" aria-label="Attack">&#9876; Atk</button>
@@ -132,7 +132,7 @@
       <div id="log" aria-live="polite"></div>
     </div>
     <div class="panel" id="controls">
-      <kbd>&#8592;&#8593;&#8595;&#8594;</kbd>/<kbd>WASD</kbd> move &middot; <kbd>1-4</kbd> combat actions &middot; <kbd>Enter</kbd> confirm &middot; <kbd>H</kbd> drink potion
+      <kbd>&#8592;&#8594;</kbd> walk &middot; <kbd>&#8593;&#8595;</kbd> climb &middot; <kbd>1-4</kbd> combat actions &middot; <kbd>Enter</kbd> confirm &middot; <kbd>H</kbd> drink potion
     </div>
   </div>
 </div>
@@ -140,6 +140,8 @@
 "use strict";
 /* ============================================================
    PIXELFUNZ — a D&D-style pixel art RPG in a single file.
+   Side-scrolling view: walk, climb, and swim across a rolling
+   overworld and descend into cavernous dungeons.
    All art is drawn procedurally on canvas. No external assets.
    ============================================================ */
 
@@ -153,9 +155,9 @@ function makeLCG(seed) {
   let st = seed;
   return () => { st = (st * 1103515245 + 12345) & 0x7fffffff; return st / 0x7fffffff; };
 }
-// Tile type IDs
+// Tile type IDs (side view: grass/sand/dirt are solid ground blocks you stand on)
 const T_GRASS = 0, T_TREE = 1, T_WATER = 2, T_MOUNTAIN = 3, T_FLOOR = 4,
-      T_WALL = 5, T_SAND = 6, T_CAVE = 7, T_TOWN = 8;
+      T_WALL = 5, T_SAND = 6, T_CAVE = 7, T_TOWN = 8, T_SKY = 9, T_DIRT = 10;
 const cv = document.getElementById("c");
 const ctx = cv.getContext("2d");
 ctx.imageSmoothingEnabled = false;
@@ -376,54 +378,50 @@ SPRITES.stairs = makeSprite([
 // --- Tiles drawn procedurally (deterministic noise) ---
 // Deterministic 2D hash noise: large odd multiplicative constants + xorshift
 // mixing produce a uniform pseudo-random value in [0, 1) for a given cell/seed.
+// Unsigned shifts keep the sign bit in play so the full range is covered.
 function hashNoise(x, y, s) {
   let h = (x * 374761393 + y * 668265263 + s * 1274126177) | 0;
-  h = ((h ^ (h >> 13)) * 1274126177) | 0;
-  return ((h ^ (h >> 16)) >>> 0) / 4294967296;
+  h = ((h ^ (h >>> 13)) * 1274126177) | 0;
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
 function drawTile(type, sx, sy, wx, wy) {
   switch (type) {
-    case T_GRASS: { // grass
-      ctx.fillStyle = "#2f7a38";
+    case T_GRASS: { // grass-topped ground block (side view)
+      ctx.fillStyle = "#7a5230";
       ctx.fillRect(sx, sy, TILE, TILE);
-      for (let i = 0; i < 6; i++) {
-        const n = hashNoise(wx, wy, i);
-        const n2 = hashNoise(wx, wy, i + 50);
-        ctx.fillStyle = n > 0.5 ? "#3a8f44" : "#276830";
-        ctx.fillRect(sx + ((n * 14) | 0) * 2, sy + ((n2 * 14) | 0) * 2, 4, 4);
+      for (let i = 0; i < 5; i++) { // dirt speckles
+        ctx.fillStyle = hashNoise(wx, wy, i + 50) > 0.5 ? "#8a6038" : "#6a4628";
+        ctx.fillRect(sx + ((hashNoise(wx, wy, i) * 14) | 0) * 2, sy + 10 + ((hashNoise(wx, wy, i + 10) * 10) | 0) * 2, 4, 2);
       }
-      // grass blade tufts
-      for (let i = 0; i < 3; i++) {
-        const bx = sx + ((hashNoise(wx, wy, i + 60) * 14) | 0) * 2;
-        const by = sy + ((hashNoise(wx, wy, i + 70) * 12) | 0) * 2;
-        ctx.fillStyle = "#4aa050";
-        ctx.fillRect(bx, by, 2, 6);
-        ctx.fillRect(bx + 4, by + 2, 2, 4);
+      // grass cap
+      ctx.fillStyle = "#2f7a38";
+      ctx.fillRect(sx, sy, TILE, 8);
+      ctx.fillStyle = "#3a8f44";
+      ctx.fillRect(sx, sy, TILE, 3);
+      // grass blades poking up along the surface
+      for (let i = 0; i < 4; i++) {
+        const bx = sx + ((hashNoise(wx, wy, i + 60) * 15) | 0) * 2;
+        ctx.fillStyle = hashNoise(wx, wy, i + 65) > 0.5 ? "#4aa050" : "#276830";
+        ctx.fillRect(bx, sy, 2, 4 + ((hashNoise(wx, wy, i + 70) * 3) | 0) * 2);
       }
-      // occasional wildflower
-      const fn = hashNoise(wx, wy, 80);
-      if (fn > 0.88) {
-        const fx = sx + ((hashNoise(wx, wy, 81) * 12) | 0) * 2 + 2;
-        const fy = sy + ((hashNoise(wx, wy, 82) * 12) | 0) * 2 + 2;
-        ctx.fillStyle = fn > 0.94 ? "#e8d050" : "#e8e8f0";
-        ctx.fillRect(fx, fy, 4, 4);
-        ctx.fillStyle = "#c07828";
-        ctx.fillRect(fx + 1, fy + 1, 2, 2);
+      // ragged grass-to-dirt edge
+      for (let i = 0; i < 4; i++) {
+        if (hashNoise(wx, wy, i + 75) > 0.5) {
+          ctx.fillStyle = "#2f7a38";
+          ctx.fillRect(sx + i * 8 + 2, sy + 8, 4, 2);
+        }
       }
       break;
     }
-    case T_TREE: { // tree
-      drawTile(T_GRASS, sx, sy, wx, wy);
-      // ground shadow under the canopy
-      ctx.fillStyle = "rgba(0,0,0,0.18)";
-      ctx.fillRect(sx + 6, sy + 26, 20, 4);
+    case T_TREE: { // tree standing on the ground below (sky behind)
+      drawTile(T_SKY, sx, sy, wx, wy);
       // trunk with bark shading
       ctx.fillStyle = "#5a4020";
-      ctx.fillRect(sx + 12, sy + 20, 8, 10);
+      ctx.fillRect(sx + 12, sy + 20, 8, 12);
       ctx.fillStyle = "#3e2a12";
-      ctx.fillRect(sx + 17, sy + 20, 3, 10);
+      ctx.fillRect(sx + 17, sy + 20, 3, 12);
       ctx.fillStyle = "#6e5228";
-      ctx.fillRect(sx + 12, sy + 20, 2, 10);
+      ctx.fillRect(sx + 12, sy + 20, 2, 12);
       // layered canopy: dark base, mid tone, sunlit top
       ctx.fillStyle = "#1c5228";
       ctx.fillRect(sx + 4, sy + 4, 24, 18);
@@ -464,36 +462,27 @@ function drawTile(type, sx, sy, wx, wy) {
       }
       break;
     }
-    case T_MOUNTAIN: { // mountain
+    case T_MOUNTAIN: { // solid rock block
       ctx.fillStyle = "#5a5a66";
       ctx.fillRect(sx, sy, TILE, TILE);
-      // scattered rocky rubble at the base
-      for (let i = 0; i < 4; i++) {
+      // chunky stone facets
+      for (let i = 0; i < 5; i++) {
         ctx.fillStyle = hashNoise(wx, wy, i + 110) > 0.5 ? "#6a6a78" : "#4c4c58";
-        ctx.fillRect(sx + ((hashNoise(wx, wy, i + 115) * 14) | 0) * 2,
-                     sy + ((hashNoise(wx, wy, i + 120) * 14) | 0) * 2, 4, 2);
+        ctx.fillRect(sx + ((hashNoise(wx, wy, i + 115) * 12) | 0) * 2,
+                     sy + ((hashNoise(wx, wy, i + 120) * 12) | 0) * 2, 8, 6);
       }
-      // shaded east face gives the peak volume
-      ctx.fillStyle = "#63636f";
-      ctx.beginPath();
-      ctx.moveTo(sx + 16, sy + 4); ctx.lineTo(sx + 28, sy + 28); ctx.lineTo(sx + 16, sy + 28);
-      ctx.fill();
+      // crevice lines
+      ctx.fillStyle = "#3e3e48";
+      if (hashNoise(wx, wy, 125) > 0.5) {
+        ctx.fillRect(sx + ((hashNoise(wx, wy, 126) * 12) | 0) * 2 + 2, sy + 4, 2, 12);
+        ctx.fillRect(sx + ((hashNoise(wx, wy, 126) * 12) | 0) * 2 + 4, sy + 16, 2, 8);
+      }
+      // top-edge highlight
       ctx.fillStyle = "#78788a";
-      ctx.beginPath();
-      ctx.moveTo(sx + 4, sy + 28); ctx.lineTo(sx + 16, sy + 4); ctx.lineTo(sx + 16, sy + 28);
-      ctx.fill();
-      // crevice line down the shaded face
-      ctx.fillStyle = "#50505c";
-      ctx.fillRect(sx + 18, sy + 12, 2, 8);
-      ctx.fillRect(sx + 20, sy + 20, 2, 6);
-      // snow cap with drips
-      ctx.fillStyle = "#e8e8f0";
-      ctx.fillRect(sx + 13, sy + 6, 6, 4);
-      ctx.fillRect(sx + 12, sy + 10, 2, 2);
-      ctx.fillRect(sx + 18, sy + 10, 2, 2);
+      ctx.fillRect(sx, sy, TILE, 3);
       break;
     }
-    case T_FLOOR: { // dungeon floor
+    case T_FLOOR: { // dungeon cavern air (carved-out space)
       ctx.fillStyle = "#3a3242";
       ctx.fillRect(sx, sy, TILE, TILE);
       ctx.fillStyle = "#443a4e";
@@ -566,23 +555,31 @@ function drawTile(type, sx, sy, wx, wy) {
       }
       break;
     }
-    case T_CAVE: { // dungeon entrance (cave)
-      drawTile(T_MOUNTAIN, sx, sy, wx, wy);
+    case T_CAVE: { // dungeon entrance: rocky mound with a dark opening (sky behind)
+      drawTile(T_SKY, sx, sy, wx, wy);
+      ctx.fillStyle = "#5a5a66";
+      ctx.beginPath();
+      ctx.moveTo(sx, sy + 32); ctx.lineTo(sx + 6, sy + 8); ctx.lineTo(sx + 16, sy + 2);
+      ctx.lineTo(sx + 26, sy + 8); ctx.lineTo(sx + 32, sy + 32);
+      ctx.fill();
+      ctx.fillStyle = "#6a6a78";
+      ctx.fillRect(sx + 10, sy + 4, 12, 4);
+      ctx.fillRect(sx + 6, sy + 10, 6, 4);
       // rocky rim framing the opening
       ctx.fillStyle = "#8a8a9a";
       ctx.fillRect(sx + 8, sy + 12, 16, 2);
-      ctx.fillRect(sx + 8, sy + 14, 2, 14);
-      ctx.fillRect(sx + 22, sy + 14, 2, 14);
+      ctx.fillRect(sx + 8, sy + 14, 2, 18);
+      ctx.fillRect(sx + 22, sy + 14, 2, 18);
       ctx.fillStyle = "#000";
-      ctx.fillRect(sx + 10, sy + 14, 12, 14);
+      ctx.fillRect(sx + 10, sy + 14, 12, 18);
       ctx.fillRect(sx + 12, sy + 10, 8, 6);
       // faint inner gloom so the entrance reads as deep
       ctx.fillStyle = "#181820";
       ctx.fillRect(sx + 10, sy + 14, 12, 2);
       break;
     }
-    case T_TOWN: { // town
-      drawTile(T_GRASS, sx, sy, wx, wy);
+    case T_TOWN: { // town house standing on the ground below (sky behind)
+      drawTile(T_SKY, sx, sy, wx, wy);
       // roof with shaded underside and ridge highlight
       ctx.fillStyle = "#a04030";
       ctx.beginPath();
@@ -599,22 +596,56 @@ function drawTile(type, sx, sy, wx, wy) {
       ctx.fillRect(sx + 22, sy + 3, 4, 7);
       // walls with timber framing, door, and lit window
       ctx.fillStyle = "#c8a870";
-      ctx.fillRect(sx + 6, sy + 14, 20, 14);
+      ctx.fillRect(sx + 6, sy + 14, 20, 18);
       ctx.fillStyle = "#8a6a3a";
       ctx.fillRect(sx + 6, sy + 14, 20, 1);
-      ctx.fillRect(sx + 6, sy + 14, 1, 14);
-      ctx.fillRect(sx + 25, sy + 14, 1, 14);
+      ctx.fillRect(sx + 6, sy + 14, 1, 18);
+      ctx.fillRect(sx + 25, sy + 14, 1, 18);
       ctx.fillStyle = "#503820";
-      ctx.fillRect(sx + 13, sy + 18, 6, 10);
+      ctx.fillRect(sx + 13, sy + 20, 6, 12);
       ctx.fillStyle = "#e8c840";
-      ctx.fillRect(sx + 17, sy + 24, 1, 1); // door handle
+      ctx.fillRect(sx + 17, sy + 26, 1, 1); // door handle
       ctx.fillStyle = "#f0d878";
       ctx.fillRect(sx + 21, sy + 18, 3, 3); // warm window glow
       break;
     }
+    case T_SKY: { // open sky with drifting cloud wisps
+      ctx.fillStyle = "#8ec4e8";
+      ctx.fillRect(sx, sy, TILE, TILE);
+      const cn = hashNoise(wx, wy, 170);
+      if (cn > 0.82) {
+        const cx2 = sx + ((hashNoise(wx, wy, 171) * 8) | 0) * 2;
+        const cy2 = sy + ((hashNoise(wx, wy, 172) * 10) | 0) * 2;
+        ctx.fillStyle = "#e8f2fa";
+        ctx.fillRect(cx2, cy2 + 2, 16, 4);
+        ctx.fillRect(cx2 + 4, cy2, 8, 2);
+        ctx.fillStyle = "#c8dcee";
+        ctx.fillRect(cx2, cy2 + 6, 16, 2);
+      }
+      break;
+    }
+    case T_DIRT: { // underground earth block
+      ctx.fillStyle = "#6a4628";
+      ctx.fillRect(sx, sy, TILE, TILE);
+      for (let i = 0; i < 6; i++) {
+        ctx.fillStyle = hashNoise(wx, wy, i + 180) > 0.5 ? "#7a5230" : "#583a20";
+        ctx.fillRect(sx + ((hashNoise(wx, wy, i + 185) * 14) | 0) * 2,
+                     sy + ((hashNoise(wx, wy, i + 190) * 14) | 0) * 2, 6, 4);
+      }
+      // the odd buried stone
+      if (hashNoise(wx, wy, 195) > 0.8) {
+        ctx.fillStyle = "#8a8a8a";
+        ctx.fillRect(sx + ((hashNoise(wx, wy, 196) * 11) | 0) * 2 + 2,
+                     sy + ((hashNoise(wx, wy, 197) * 11) | 0) * 2 + 2, 6, 4);
+      }
+      break;
+    }
   }
 }
-const SOLID = { [T_TREE]: true, [T_WATER]: true, [T_MOUNTAIN]: true, [T_WALL]: true };
+// Side-view: ground blocks are solid; sky/water/carved space are passable.
+const SOLID = { [T_GRASS]: true, [T_SAND]: true, [T_DIRT]: true, [T_MOUNTAIN]: true, [T_WALL]: true };
+// Tiles that support standing on top of them (water lets you swim along its surface).
+function supports(t) { return SOLID[t] || t === T_WATER; }
 
 // ---------- Classes (D&D style) ----------
 const CLASSES = {
@@ -633,24 +664,47 @@ const MONSTERS = {
   dragon:   { name: "Young Dragon",  spr: "dragon",   hp: [10, 10, 20],ac: 17, atk: 8, dmg: [2, 8, 3],  xp: 600, cr: 6, boss: true },
 };
 
-// ---------- World generation ----------
-const MAP_W = 48, MAP_H = 48;
+// ---------- World generation (side view) ----------
+const MAP_W = 96, MAP_H = 48;
+const WATER_LEVEL = 30;   // rows below this can flood into pools
+const ROCK_DEPTH = 6;     // dirt turns to rock this far under the surface
 function genOverworld(seed) {
+  // Rolling heightmap: hs[x] = row of the surface block in column x.
+  // Value noise: linear interpolation between control points every 8 tiles
+  // gives smooth hills; a small per-tile wobble keeps them organic.
+  const hs = [];
+  for (let x = 0; x < MAP_W; x++) {
+    const c0 = hashNoise(x >> 3, 0, seed), c1 = hashNoise((x >> 3) + 1, 0, seed);
+    const f = (x & 7) / 8;
+    const n = c0 * (1 - f) + c1 * f;
+    hs.push(22 + Math.round(n * 14 + hashNoise(x, 0, seed + 1) * 1.5)); // rows ~22..37
+  }
+  // Safety: cap cliffs at 2 tiles (always climbable).
+  for (let pass = 0; pass < 3; pass++) {
+    for (let x = 1; x < MAP_W; x++) {
+      if (hs[x] > hs[x - 1] + 2) hs[x] = hs[x - 1] + 2;
+      if (hs[x] < hs[x - 1] - 2) hs[x] = hs[x - 1] - 2;
+    }
+  }
   const m = [];
   for (let y = 0; y < MAP_H; y++) {
     m.push([]);
     for (let x = 0; x < MAP_W; x++) {
-      const n = hashNoise(x >> 2, y >> 2, seed) * 0.6 + hashNoise(x, y, seed + 1) * 0.4;
-      let t = T_GRASS;
-      if (x === 0 || y === 0 || x === MAP_W - 1 || y === MAP_H - 1) t = T_MOUNTAIN;
-      else if (n < 0.18) t = T_WATER;
-      else if (n < 0.24) t = T_SAND;
-      else if (n > 0.82) t = T_MOUNTAIN;
-      else if (n > 0.68) t = T_TREE;
+      const h = hs[x];
+      let t;
+      if (x === 0 || x === MAP_W - 1) t = T_MOUNTAIN;          // world walls
+      else if (y < h) t = h > WATER_LEVEL && y >= WATER_LEVEL ? T_WATER : T_SKY; // pools in dips
+      else if (y === h) t = h > WATER_LEVEL ? T_SAND : (h <= 24 ? T_MOUNTAIN : T_GRASS); // lakebed / peak / meadow
+      else t = y - h >= ROCK_DEPTH ? T_MOUNTAIN : T_DIRT;
       m[y].push(t);
     }
   }
-  return m;
+  // Beach sand beside the pools, trees scattered on the grass.
+  for (let x = 1; x < MAP_W - 1; x++) {
+    if (m[hs[x]][x] === T_GRASS && (hs[x - 1] > WATER_LEVEL || hs[x + 1] > WATER_LEVEL)) m[hs[x]][x] = T_SAND;
+    if (m[hs[x]][x] === T_GRASS && hashNoise(x, 0, seed + 7) > 0.78) m[hs[x] - 1][x] = T_TREE;
+  }
+  return { map: m, heights: hs };
 }
 function genDungeon(seed, level) {
   const m = [];
@@ -658,21 +712,28 @@ function genDungeon(seed, level) {
     m.push([]);
     for (let x = 0; x < MAP_W; x++) m[y].push(T_WALL);
   }
-  // Drunkard's-walk carving using a simple LCG (glibc constants) for
-  // deterministic dungeon layouts per seed/level.
-  let x = MAP_W >> 1, y = MAP_H >> 1, steps = 1400;
+  // Drunkard's-walk carving, biased sideways so caverns scroll horizontally.
+  // Each carved cell also clears the cell above for standing headroom.
+  let x = 3, y = MAP_H >> 1, steps = 2200;
   const rnd = makeLCG(seed * 1000 + level);
-  const carved = [];
   while (steps-- > 0) {
     m[y][x] = T_FLOOR;
-    carved.push([x, y]);
-    const d = (rnd() * 4) | 0;
-    if (d === 0 && x > 1) x--;
-    else if (d === 1 && x < MAP_W - 2) x++;
-    else if (d === 2 && y > 1) y--;
-    else if (d === 3 && y < MAP_H - 2) y++;
+    if (y > 1) m[y - 1][x] = T_FLOOR;
+    const r = rnd();
+    if (r < 0.42 && x > 2) x--;
+    else if (r < 0.84 && x < MAP_W - 3) x++;
+    else if (r < 0.92 && y > 2) y--;
+    else if (y < MAP_H - 2) y++;
   }
-  return { map: m, carved };
+  // Standable spots: carved cells with solid footing, ordered left to right.
+  const standable = [];
+  for (let sy = 1; sy < MAP_H - 1; sy++) {
+    for (let sx = 1; sx < MAP_W - 1; sx++) {
+      if (m[sy][sx] === T_FLOOR && m[sy + 1][sx] === T_WALL) standable.push([sx, sy]);
+    }
+  }
+  standable.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  return { map: m, standable };
 }
 
 // ---------- Game state ----------
@@ -683,6 +744,7 @@ const G = {
   area: "overworld",   // overworld | dungeon1 | dungeon2 ...
   dungeonLevel: 0,
   px: 0, py: 0,
+  face: 1,             // 1 = facing right, -1 = facing left
   moveAnim: null,      // {fx, fy, t0}: slide from (fx,fy) to (px,py) started at t0
   entities: [],        // {x, y, kind:"monster"/"chest"/"stairs"/"entrance"/"town", type}
   overworldState: null,
@@ -717,11 +779,22 @@ function newPlayer(classKey, stats) {
   };
 }
 
+// Standing spot in overworld column x: the passable (non-water) tile atop the
+// first solid block, or null if the column is flooded or blocked.
+function surfaceSpot(map, x) {
+  for (let y = 1; y < MAP_H; y++) {
+    if (SOLID[map[y][x]]) {
+      const above = map[y - 1][x];
+      return (above === T_WATER || SOLID[above]) ? null : [x, y - 1];
+    }
+  }
+  return null;
+}
 function findOpenSpot(map, rnd) {
   for (let tries = 0; tries < 500; tries++) {
-    const x = 1 + ((rnd() * (MAP_W - 2)) | 0);
-    const y = 1 + ((rnd() * (MAP_H - 2)) | 0);
-    if (!SOLID[map[y][x]]) return [x, y];
+    const x = 2 + ((rnd() * (MAP_W - 4)) | 0);
+    const spot = surfaceSpot(map, x);
+    if (spot && map[spot[1]][spot[0]] === T_SKY) return spot;
   }
   return [MAP_W >> 1, MAP_H >> 1];
 }
@@ -731,15 +804,14 @@ function enterOverworld() {
     const s = G.overworldState;
     G.map = s.map; G.entities = s.entities; G.px = s.px; G.py = s.py;
   } else {
-    G.map = genOverworld(G.seed);
+    G.map = genOverworld(G.seed).map;
     const rnd = makeLCG(G.seed);
     G.entities = [];
     // town start
-    let [tx, ty] = findOpenSpot(G.map, rnd);
+    const [tx, ty] = findOpenSpot(G.map, rnd);
     G.map[ty][tx] = T_TOWN;
-    G.px = tx; G.py = ty + 1;
-    if (SOLID[G.map[G.py][G.px]]) G.map[G.py][G.px] = T_GRASS;
-    // dungeon entrances
+    G.px = Math.min(MAP_W - 2, tx + 1); G.py = ty;
+    // dungeon entrances spread across the world
     for (let i = 0; i < 3; i++) {
       const [dx, dy] = findOpenSpot(G.map, rnd);
       G.map[dy][dx] = T_CAVE;
@@ -761,6 +833,7 @@ function enterOverworld() {
   G.area = "overworld";
   G.dungeonLevel = 0;
   G.moveAnim = null;
+  applyGravity();
 }
 
 function saveOverworld() {
@@ -771,34 +844,34 @@ function saveOverworld() {
 
 function enterDungeon(depth) {
   saveOverworld();
-  const { map, carved } = genDungeon(G.seed, depth);
+  const { map, standable } = genDungeon(G.seed, depth);
   G.map = map;
   G.area = "dungeon" + depth;
   G.dungeonLevel = depth;
   G.entities = [];
   const rnd = makeLCG(G.seed + depth * 777);
-  const start = carved[0];
+  // enter at the leftmost footing, exit stairs at the rightmost
+  const start = standable[0];
   G.px = start[0]; G.py = start[1];
   G.moveAnim = null;
-  // exit stairs at far end
-  const end = carved[carved.length - 1];
+  const end = standable[standable.length - 1];
   G.entities.push({ x: end[0], y: end[1], kind: "stairs" });
   // monsters scale with depth
   const pools = [["goblin", "skeleton", "wolf"], ["skeleton", "orc", "wolf"], ["orc", "orc", "skeleton"]];
   const pool = pools[Math.min(depth - 1, 2)];
   const count = 6 + depth * 2;
   for (let i = 0; i < count; i++) {
-    const [x, y] = carved[(rnd() * carved.length) | 0];
+    const [x, y] = standable[(rnd() * standable.length) | 0];
     if ((x === G.px && y === G.py) || (x === end[0] && y === end[1])) continue;
     G.entities.push({ x, y, kind: "monster", type: pool[(rnd() * pool.length) | 0] });
   }
   // boss dragon in deepest dungeon guarding the stairs vicinity
   if (depth === 3) {
-    const [bx, by] = carved[carved.length - 2];
+    const [bx, by] = standable[standable.length - 2];
     G.entities.push({ x: bx, y: by, kind: "monster", type: "dragon" });
   }
   for (let i = 0; i < 2 + depth; i++) {
-    const [x, y] = carved[(rnd() * carved.length) | 0];
+    const [x, y] = standable[(rnd() * standable.length) | 0];
     if (x === G.px && y === G.py) continue;
     G.entities.push({ x, y, kind: "chest" });
   }
@@ -978,11 +1051,44 @@ function levelUp() {
 }
 
 // ---------- Exploration ----------
+// ---------- Side-scrolling movement ----------
+function solidAt(x, y) {
+  if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return true;
+  return !!SOLID[G.map[y][x]];
+}
+function supportedAt(x, y) { // standing on a block or floating on water
+  return y >= MAP_H - 1 || supports(G.map[y + 1][x]);
+}
+// Fall until landing on a block or water surface. Returns tiles fallen.
+function applyGravity() {
+  let fell = 0;
+  while (!supportedAt(G.px, G.py) && fell < MAP_H) { G.py++; fell++; }
+  return fell;
+}
+// You can climb up when grounded (a hop) or holding onto an adjacent wall.
+// Cavern walls are rough rock: inside dungeons you can always climb.
+function canClimb() {
+  return G.dungeonLevel > 0 || supportedAt(G.px, G.py) ||
+         solidAt(G.px - 1, G.py) || solidAt(G.px + 1, G.py) ||
+         solidAt(G.px - 1, G.py - 1) || solidAt(G.px + 1, G.py - 1);
+}
+
 function tryMove(dx, dy) {
   if (G.moveAnim) return; // still sliding to the previous tile
-  const nx = G.px + dx, ny = G.py + dy;
+  if (dx) G.face = dx;
+  let nx = G.px + dx, ny = G.py + dy;
   if (nx < 0 || ny < 0 || nx >= MAP_W || ny >= MAP_H) return;
-  const t = G.map[ny][nx];
+
+  if (dy < 0) { // climb / hop up
+    if (solidAt(nx, ny) || !canClimb()) return;
+  } else if (dy > 0) { // climb down
+    if (solidAt(nx, ny)) return;
+  } else { // walk: auto-step up 1-tile ledges
+    if (solidAt(nx, ny)) {
+      if (!solidAt(nx, ny - 1) && !solidAt(G.px, G.py - 1)) ny--;
+      else return;
+    }
+  }
 
   // check entities at target
   const ent = G.entities.find(e => e.x === nx && e.y === ny);
@@ -1000,18 +1106,27 @@ function tryMove(dx, dy) {
       return;
     }
   }
-  if (SOLID[t]) return;
 
-  G.moveAnim = { fx: G.px, fy: G.py, t0: performance.now() };
+  const fx = G.px, fy = G.py;
   G.px = nx; G.py = ny;
+  if (dy >= 0) applyGravity(); // climbing up isn't undone by gravity mid-ascent
+  G.moveAnim = { fx, fy, t0: performance.now() };
 
-  if (t === T_CAVE) { // dungeon entrance
-    const e = G.entities.find(e2 => e2.kind === "entrance" && e2.x === nx && e2.y === ny);
+  // landed on something interesting?
+  const landEnt = G.entities.find(e => e.x === G.px && e.y === G.py);
+  if (landEnt) {
+    if (landEnt.kind === "monster") { startCombat(landEnt.type, landEnt); return; }
+    if (landEnt.kind === "chest") openChest(landEnt);
+  }
+  const lt = G.map[G.py][G.px];
+
+  if (lt === T_CAVE) { // dungeon entrance
+    const e = G.entities.find(e2 => e2.kind === "entrance" && e2.x === G.px && e2.y === G.py);
     enterDungeon(e ? e.depth : 1);
     updateHUD();
     return;
   }
-  if (t === T_TOWN) { // town: rest
+  if (lt === T_TOWN) { // town: rest
     const p = G.player;
     if (p.hp < p.hpMax || p.potions < 2) {
       p.hp = p.hpMax;
@@ -1026,7 +1141,7 @@ function tryMove(dx, dy) {
   if (G.dungeonLevel > 0 && Math.random() < RANDOM_ENCOUNTER_CHANCE) {
     const pool = ["goblin", "skeleton", "wolf", "orc"];
     const type = pool[Math.min(pool.length - 1, (Math.random() * (2 + G.dungeonLevel)) | 0)];
-    const wanderer = { x: nx, y: ny, kind: "monster", type };
+    const wanderer = { x: G.px, y: G.py, kind: "monster", type };
     G.entities.push(wanderer);
     log("A monster ambushes you from the shadows!", "dmg");
     startCombat(type, wanderer);
@@ -1128,12 +1243,20 @@ function render() {
       ctx.drawImage(spr, ex, ey);
     }
   }
-  // player with idle bob
+  // player with idle bob, facing the way they last walked
   const bob = (G.tick >> 4) % 2;
   const pxs = Math.round((ipx - camX) * TILE), pys = Math.round((ipy - camY) * TILE);
   ctx.fillStyle = "rgba(0,0,0,0.25)";
   ctx.fillRect(pxs + 6, pys + 29, 20, 3);
-  ctx.drawImage(SPRITES[G.player.cls], pxs, pys - bob);
+  if (G.face < 0) {
+    ctx.save();
+    ctx.translate(pxs + TILE, pys - bob);
+    ctx.scale(-1, 1);
+    ctx.drawImage(SPRITES[G.player.cls], 0, 0);
+    ctx.restore();
+  } else {
+    ctx.drawImage(SPRITES[G.player.cls], pxs, pys - bob);
+  }
 
   // area label
   ctx.fillStyle = "rgba(0,0,0,0.6)";

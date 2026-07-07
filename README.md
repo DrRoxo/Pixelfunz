@@ -1,6 +1,6 @@
 # Pixelfunz
 
-⚔️ A D&D-style pixel art RPG contained in **a single file**: [`index.html`](index.html).
+⚔️ A D&D-style side-scrolling pixel art RPG contained in **a single file**: [`index.html`](index.html).
 
 No build steps, no dependencies, no external assets — all pixel art is drawn procedurally on canvas. Just open `index.html` in a browser and play.
 
@@ -8,7 +8,7 @@ No build steps, no dependencies, no external assets — all pixel art is drawn p
 
 1. Open `index.html` in any modern browser.
 2. Press **Enter**, pick a class (Fighter, Rogue, Wizard, or Cleric), and roll your ability scores (4d6 drop lowest — press **R** to reroll).
-3. Explore the overworld, loot chests, and enter the cave entrances to descend into dungeons.
+3. Walk, climb, and swim across the rolling overworld, loot chests, and enter the cave entrances to descend into cavernous dungeons.
 4. Slay the **Young Dragon** in Dungeon 3 to win!
 
 Works on mobile too: on touch devices an on-screen D-pad and action buttons appear automatically.
@@ -17,13 +17,17 @@ Works on mobile too: on touch devices an on-screen D-pad and action buttons appe
 
 | Key | Action |
 |---|---|
-| Arrow keys / WASD | Move |
+| ←/→ or A/D | Walk left/right (auto-steps up small ledges) |
+| ↑ or W | Climb / hop up (needs ground underfoot or a wall to grab) |
+| ↓ or S | Climb down |
 | 1 | Attack |
 | 2 | Cast spell (Wizard/Cleric) |
 | 3 | Defend (+4 AC) |
 | 4 | Flee |
 | H | Drink a healing potion |
 | Enter | Confirm / start |
+
+Gravity applies: walk off a ledge and you'll fall until you land. Water pools let you swim along at any depth.
 
 On touch devices, an on-screen D-pad and buttons for all of the above are shown below the game canvas.
 
