@@ -54,12 +54,69 @@
   #xpbar > div { background: linear-gradient(#50a0e0, #204880); }
   #controls { font-size: 11px; color: #a08868; }
   kbd { background: #402810; padding: 0 4px; border-radius: 3px; color: #f0c060; }
+  canvas { max-width: 100%; height: auto; }
+  /* Touch controls: shown only on touch (coarse-pointer) devices */
+  #touch-controls {
+    display: none;
+    width: 100%;
+    max-width: 480px;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+  }
+  #touch-controls button {
+    background: #241a2e;
+    border: 3px solid #6b4a2a;
+    color: #f0c060;
+    font-family: 'Courier New', monospace;
+    font-size: 16px;
+    border-radius: 6px;
+    touch-action: manipulation;
+  }
+  #touch-controls button:active { background: #402810; }
+  #dpad {
+    display: grid;
+    grid-template-areas: ". up ." "left . right" ". down .";
+    gap: 4px;
+  }
+  #dpad button { width: 52px; height: 52px; }
+  #action-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 6px;
+    max-width: 200px;
+  }
+  #action-buttons button { min-width: 58px; height: 44px; font-size: 13px; }
+  @media (pointer: coarse) {
+    #touch-controls { display: flex; }
+  }
 </style>
 </head>
 <body>
 <h1 aria-label="Pixelfunz">&#9876; PIXELFUNZ &#9876;</h1>
 <div id="game-wrap">
   <canvas id="c" width="480" height="480" tabindex="0"></canvas>
+  <div id="touch-controls" aria-label="Touch controls">
+    <div id="dpad">
+      <button type="button" data-key="ArrowUp" aria-label="Move up" style="grid-area: up;">&#9650;</button>
+      <button type="button" data-key="ArrowLeft" aria-label="Move left" style="grid-area: left;">&#9664;</button>
+      <button type="button" data-key="ArrowRight" aria-label="Move right" style="grid-area: right;">&#9654;</button>
+      <button type="button" data-key="ArrowDown" aria-label="Move down" style="grid-area: down;">&#9660;</button>
+    </div>
+    <div id="action-buttons">
+      <button type="button" data-key="1" aria-label="Attack">&#9876; Atk</button>
+      <button type="button" data-key="2" aria-label="Cast spell">&#10024; Spl</button>
+      <button type="button" data-key="3" aria-label="Defend">&#128737; Def</button>
+      <button type="button" data-key="4" aria-label="Flee">&#128168; Run</button>
+      <button type="button" data-key="h" aria-label="Drink potion">&#129380; Pot</button>
+      <button type="button" data-key="r" aria-label="Reroll stats">&#127922; Roll</button>
+      <button type="button" data-key="Enter" aria-label="Confirm">&#9166; OK</button>
+    </div>
+  </div>
   <div id="side">
     <div class="panel" id="stats-panel">
       <h3 id="pname">Adventurer</h3>
@@ -1052,10 +1109,7 @@ function beginAdventure() {
   updateHUD();
 }
 
-document.addEventListener("keydown", (ev) => {
-  const k = ev.key;
-  if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(k)) ev.preventDefault();
-
+function handleInput(k) {
   if (G.mode === "title") {
     if (k === "Enter") startCreation();
     return;
@@ -1099,6 +1153,20 @@ document.addEventListener("keydown", (ev) => {
       }
     }
   }
+}
+
+document.addEventListener("keydown", (ev) => {
+  const k = ev.key;
+  if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(k)) ev.preventDefault();
+  handleInput(k);
+});
+
+// Touch controls: buttons dispatch the same keys the keyboard handler uses.
+document.querySelectorAll("#touch-controls button").forEach((btn) => {
+  btn.addEventListener("pointerdown", (ev) => {
+    ev.preventDefault();
+    handleInput(btn.dataset.key);
+  });
 });
 
 cv.focus();

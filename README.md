@@ -11,6 +11,8 @@ No build steps, no dependencies, no external assets — all pixel art is drawn p
 3. Explore the overworld, loot chests, and enter the cave entrances to descend into dungeons.
 4. Slay the **Young Dragon** in Dungeon 3 to win!
 
+Works on mobile too: on touch devices an on-screen D-pad and action buttons appear automatically.
+
 ## Controls
 
 | Key | Action |
@@ -22,6 +24,8 @@ No build steps, no dependencies, no external assets — all pixel art is drawn p
 | 4 | Flee |
 | H | Drink a healing potion |
 | Enter | Confirm / start |
+
+On touch devices, an on-screen D-pad and buttons for all of the above are shown below the game canvas.
 
 ## D&D-style mechanics
 
