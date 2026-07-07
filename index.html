@@ -191,32 +191,41 @@ function log(msg, cls) {
 
 // ---------- Pixel sprite engine ----------
 // Sprites are 16x16 grids of palette indices, scaled 2x to 32px.
+// 16-bit style: each material gets three shades — highlight / mid / shadow —
+// and makeSprite adds an automatic dark outline around every sprite.
 const PAL = {
   ".": null,        // transparent
-  "0": "#000000", "s": "#b09070", "S": "#806048", // skin
-  "h": "#4a2c16", "H": "#26180c",                 // hair
-  "r": "#8a2822", "R": "#521410",                 // red
-  "b": "#2c4070", "B": "#1a2444",                 // blue
-  "g": "#3a5c34", "G": "#233a20",                 // green
-  "y": "#b09030", "Y": "#786018",                 // gold
-  "w": "#b8b8bc", "W": "#787884",                 // white/steel
-  "m": "#6a6a74", "M": "#3c3c46",                 // metal
-  "p": "#5e3480", "P": "#3a1e54",                 // purple
-  "k": "#2c222c", "K": "#16101a",                 // dark
-  "n": "#6a5230", "N": "#44301a",                 // brown
-  "o": "#a85e28", "O": "#703a10",                 // orange
-  "e": "#8ca444", "E": "#5a7226",                 // sick green
-  "f": "#c85018", "F": "#8a2400",                 // fire
-  "q": "#aaa294", "Q": "#6e685c",                 // bone
+  "0": "#000000",
+  "1": "#d8b494", "s": "#b09070", "S": "#806048", // skin (hi/mid/lo)
+  "2": "#6e4626", "h": "#4a2c16", "H": "#26180c", // hair
+  "3": "#b84a3a", "r": "#8a2822", "R": "#521410", // red
+  "4": "#4a68a4", "b": "#2c4070", "B": "#1a2444", // blue
+  "5": "#5c8450", "g": "#3a5c34", "G": "#233a20", // green
+  "6": "#e0c05c", "y": "#b09030", "Y": "#786018", // gold
+  "7": "#e8e8ec", "w": "#b8b8bc", "W": "#787884", // white/steel
+  "8": "#9a9aa8", "m": "#6a6a74", "M": "#3c3c46", // metal
+  "9": "#8a58b4", "p": "#5e3480", "P": "#3a1e54", // purple
+  "z": "#4a3c50", "k": "#2c222c", "K": "#16101a", // dark
+  "u": "#8e7048", "n": "#6a5230", "N": "#44301a", // brown
+  "v": "#d0803e", "o": "#a85e28", "O": "#703a10", // orange
+  "x": "#b4cc6e", "e": "#8ca444", "E": "#5a7226", // sick green
+  "c": "#f08840", "f": "#c85018", "F": "#8a2400", // fire
+  "d": "#d8d2c4", "q": "#aaa294", "Q": "#6e685c", // bone
 };
+const OUTLINE = "#100c10";
 function makeSprite(rows) {
   const off = document.createElement("canvas");
   off.width = 32; off.height = 32;
   const c = off.getContext("2d");
+  const filled = (x, y) => x >= 0 && y >= 0 && x < 16 && y < 16 && !!PAL[rows[y][x]];
   for (let y = 0; y < 16; y++) {
     for (let x = 0; x < 16; x++) {
       const col = PAL[rows[y][x]];
       if (col) { c.fillStyle = col; c.fillRect(x * 2, y * 2, 2, 2); }
+      else if (filled(x - 1, y) || filled(x + 1, y) || filled(x, y - 1) || filled(x, y + 1)) {
+        // dark outline hugging the sprite silhouette (classic SNES look)
+        c.fillStyle = OUTLINE; c.fillRect(x * 2, y * 2, 2, 2);
+      }
     }
   }
   return off;
@@ -225,97 +234,97 @@ function makeSprite(rows) {
 const SPRITES = {};
 
 // --- Hero sprites per class (fighter red, wizard purple, rogue dark, cleric white) ---
-function heroSprite(a, A) { // a = tunic color, A = tunic shade
+function heroSprite(l, a, A) { // l/a/A = tunic highlight / mid / shadow
   return makeSprite([
     "................",
-    ".....hhhhhh.....",
-    "....hhhhhhhh....",
-    "....hHssssHh....",
-    "....ssssssss....",
+    ".....2hhhh2.....",
+    "....2hhhhhh2....",
+    "....hH1ss1Hh....",
+    "....1sssssss....",
     "....s0ss0sss....",
-    "....sssssSss....",
+    "....1ssssSss....",
     ".....ssSSs......",
-    "...." + a + a + a + a + a + a + a + a + "....",
-    "..s." + a + A + a + a + a + a + A + a + ".s..",
-    "..ss" + a + a + a + a + a + a + a + a + "ss..",
-    "...." + A + a + a + a + a + a + a + A + "....",
-    ".....NNyyNN.....",
-    ".....NN....NN...",
-    ".....NN....NN...",
+    "...." + l + l + a + a + a + a + a + A + "....",
+    "..1." + a + A + a + a + a + a + A + a + ".s..",
+    "..ss" + l + a + a + a + a + a + a + A + "Ss..",
+    "...." + A + a + a + a + a + a + A + A + "....",
+    ".....uNyyNN.....",
+    ".....uN....Nn...",
+    ".....nN....NN...",
     "....000....000..",
   ]);
 }
-SPRITES.fighter = heroSprite("r", "R");
-SPRITES.wizard  = heroSprite("p", "P");
-SPRITES.rogue   = heroSprite("k", "K");
-SPRITES.cleric  = heroSprite("w", "W");
+SPRITES.fighter = heroSprite("3", "r", "R");
+SPRITES.wizard  = heroSprite("9", "p", "P");
+SPRITES.rogue   = heroSprite("z", "k", "K");
+SPRITES.cleric  = heroSprite("7", "w", "W");
 
 SPRITES.goblin = makeSprite([
   "................",
   "................",
-  "..g..........g..",
-  "..gg.gggggg.gg..",
-  "..ggggggggggg...",
-  "...gggggggggg...",
-  "...g0gggg0gg....",
-  "...gggggggg.....",
-  "....ggrwgg......",
-  "....kkkkkkkk....",
-  "..g.kKkkkkKk.g..",
-  "..ggkkkkkkkkgg..",
-  "....kkkkkkkk....",
-  ".....gg..gg.....",
-  ".....gg..gg.....",
+  "..5..........g..",
+  "..5g.5g5gg5.gg..",
+  "..gg55ggggggg...",
+  "...5gggggggGg...",
+  "...g0gggg0gG....",
+  "...gggggggG.....",
+  "....ggrwgG......",
+  "....zkkkkkkk....",
+  "..5.kKkkkkKk.g..",
+  "..ggzkkkkkkKgG..",
+  "....kkkkkkKK....",
+  ".....5g..gG.....",
+  ".....gg..gG.....",
   "....000..000....",
 ]);
 SPRITES.skeleton = makeSprite([
   "................",
-  "....qqqqqqqq....",
-  "....qqqqqqqq....",
+  "....dddqqqqq....",
+  "....dqqqqqqQ....",
   "....q0qqqq0q....",
-  "....qqqqqqqq....",
+  "....qqqqqqqQ....",
   ".....q0000q.....",
-  "......qqqq......",
-  "....qqqqqqqq....",
-  "..q..qQQQQq..q..",
-  "..qq.qqqqqq.qq..",
+  "......qqqQ......",
+  "....dqqqqqqQ....",
+  "..d..qQQQQq..q..",
+  "..qq.dqqqqQ.qQ..",
   ".....qQQQQq.....",
-  "......qqqq......",
-  ".....qQ..Qq.....",
-  ".....qq..qq.....",
-  ".....qq..qq.....",
+  "......qqqQ......",
+  ".....dQ..Qq.....",
+  ".....qq..qQ.....",
+  ".....qq..qQ.....",
   "....000..000....",
 ]);
 SPRITES.orc = makeSprite([
   "................",
-  "...EEEEEEEEEE...",
-  "..EEEEEEEEEEEE..",
+  "...xEEEEEEEEE...",
+  "..xEEEEEEEEEEE..",
   "..EE0EEEEE0EEE..",
-  "..EEEEEEEEEEEE..",
+  "..xEEEEEEEEEEE..",
   "...EEwEEEEwE....",
   "...EEEEEEEEE....",
-  "....mmmmmmmm....",
-  "..E.mMmmmmMm.E..",
-  "..EEmmmmmmmmEE..",
-  "..E.mmmmmmmm.E..",
+  "....8mmmmmmm....",
+  "..x.mMmmmmMm.E..",
+  "..EE8mmmmmmmEE..",
+  "..E.mmmmmmmM.E..",
   "....MmmmmmmM....",
+  ".....xE..EE.....",
   ".....EE..EE.....",
-  ".....EE..EE.....",
-  "....NNN..NNN....",
+  "....uNN..NNN....",
   "....000..000....",
 ]);
 SPRITES.wolf = makeSprite([
   "................",
   "................",
   "................",
-  "..M..........M..",
-  "..MM........MM..",
-  "..MMMMMMMMMMM...",
-  ".MM0MMMMMMMMMM..",
+  "..8..........M..",
+  "..8M........MM..",
+  "..8MMMMMMMMMM...",
+  ".8M0MMMMMMMMMM..",
   ".MMMMMMMMMMMMM..",
-  "..MwwMMMMMMMM...",
+  "..MwwM8MMMMMM...",
   "...MMMMMMMMMM...",
-  "....MM.MM.MM....",
+  "....8M.MM.MM....",
   "....MM.MM.MM....",
   "....00.00.00....",
   "................",
@@ -323,34 +332,34 @@ SPRITES.wolf = makeSprite([
   "................",
 ]);
 SPRITES.dragon = makeSprite([
-  "....R......R....",
-  "...RR......RR...",
-  "..RRRRRRRRRRRR..",
-  ".RRrrrrrrrrrrRR.",
-  ".Rrr0rrrr0rrrR..",
-  "..rrrrrrrrrrr...",
-  "..rrfFFffFFrr...",
-  "...rrrrrrrrr....",
-  "..RrrrrrrrrrR...",
-  ".RRrrrYYrrrrRR..",
-  ".R.rrrYYrrrr.R..",
-  "...rrrrrrrrr....",
-  "....rrrrrr......",
-  "....rr..rr......",
-  "...RRR..RRR.....",
+  "....3......3....",
+  "...3R......RR...",
+  "..3RRRRRRRRRRR..",
+  ".RR3rrrrrrrrrRR.",
+  ".Rr30rrrr0rrrR..",
+  "..3rrrrrrrrrR...",
+  "..rrcFFccFFrR...",
+  "...3rrrrrrrR....",
+  "..R3rrrrrrrrR...",
+  ".RRrr6YYrrrrRR..",
+  ".R.rr6YYrrrr.R..",
+  "...3rrrrrrrR....",
+  "....3rrrrR......",
+  "....rr..rR......",
+  "...3RR..RRR.....",
   "...000..000.....",
 ]);
 SPRITES.chest = makeSprite([
   "................",
   "................",
   "................",
-  "....nnnnnnnn....",
+  "....uunnnnnn....",
+  "...unNNNNNNNn...",
+  "...unnnnnnnnn...",
+  "...nNNN66NNNn...",
+  "...unnn6ynnnn...",
   "...nNNNNNNNNn...",
-  "...nnnnnnnnnn...",
-  "...nNNNyyNNNn...",
-  "...nnnnyynnnn...",
-  "...nNNNNNNNNn...",
-  "...nnnnnnnnnn...",
+  "...unnnnnnnnn...",
   "...nNNNNNNNNn...",
   "...nnnnnnnnnn...",
   "....00000000....",
@@ -386,32 +395,55 @@ function hashNoise(x, y, s) {
   h = ((h ^ (h >>> 13)) * 1274126177) | 0;
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
+// 16-bit style helpers: banded vertical sky gradient and checkerboard dithering
+// between bands, standing in for the smooth gradients SNES games faked with rasters.
+const SKY_BANDS = ["#303a50", "#3a4458", "#444e60", "#4e5a6a", "#586474", "#626e80", "#6c788c"];
+function skyBand(wy) {
+  const t = Math.max(0, Math.min(1, wy / GROUND_ROW));
+  return Math.min(SKY_BANDS.length - 1, (t * SKY_BANDS.length) | 0);
+}
+// checkerboard-dither a 2px-pixel strip of `color` over the given rect
+function ditherRect(color, sx, sy, w, h, phase) {
+  ctx.fillStyle = color;
+  for (let dy = 0; dy < h; dy += 2) {
+    for (let dx = ((dy >> 1) + phase) % 2 * 2; dx < w; dx += 4) {
+      ctx.fillRect(sx + dx, sy + dy, 2, 2);
+    }
+  }
+}
 function drawTile(type, sx, sy, wx, wy) {
   switch (type) {
     case T_GRASS: { // grass-topped ground block (side view)
       ctx.fillStyle = "#4a3420";
       ctx.fillRect(sx, sy, TILE, TILE);
+      // subtle depth shading on the lower half of the block
+      ditherRect("#3e2c1a", sx, sy + 20, TILE, 12, wx & 1);
       for (let i = 0; i < 5; i++) { // dirt speckles
-        ctx.fillStyle = hashNoise(wx, wy, i + 50) > 0.5 ? "#584028" : "#3a2c1a";
+        ctx.fillStyle = hashNoise(wx, wy, i + 50) > 0.5 ? "#5c4630" : "#3a2c1a";
         ctx.fillRect(sx + ((hashNoise(wx, wy, i) * 14) | 0) * 2, sy + 10 + ((hashNoise(wx, wy, i + 10) * 10) | 0) * 2, 4, 2);
       }
-      // grass cap
+      // grass cap: four shades from sunlit rim to shaded underside
       ctx.fillStyle = "#3a4626";
       ctx.fillRect(sx, sy, TILE, 8);
-      ctx.fillStyle = "#48562e";
-      ctx.fillRect(sx, sy, TILE, 3);
+      ctx.fillStyle = "#4c5c30";
+      ctx.fillRect(sx, sy, TILE, 5);
+      ctx.fillStyle = "#5e7038";
+      ctx.fillRect(sx, sy, TILE, 2);
+      ditherRect("#4c5c30", sx, sy + 4, TILE, 4, wx & 1);
       // grass blades poking up along the surface
       for (let i = 0; i < 4; i++) {
         const bx = sx + ((hashNoise(wx, wy, i + 60) * 15) | 0) * 2;
-        ctx.fillStyle = hashNoise(wx, wy, i + 65) > 0.5 ? "#56643a" : "#28321c";
+        ctx.fillStyle = hashNoise(wx, wy, i + 65) > 0.5 ? "#6a7c40" : "#2c3a1e";
         ctx.fillRect(bx, sy, 2, 4 + ((hashNoise(wx, wy, i + 70) * 3) | 0) * 2);
       }
-      // ragged grass-to-dirt edge
+      // ragged, dithered grass-to-dirt edge
       for (let i = 0; i < 4; i++) {
         if (hashNoise(wx, wy, i + 75) > 0.5) {
           ctx.fillStyle = "#3a4626";
           ctx.fillRect(sx + i * 8 + 2, sy + 8, 4, 2);
         }
+        ctx.fillStyle = "#443a22";
+        ctx.fillRect(sx + i * 8 + (i & 1) * 2, sy + 10, 2, 2);
       }
       break;
     }
@@ -422,20 +454,25 @@ function drawTile(type, sx, sy, wx, wy) {
       ctx.fillRect(sx + 12, sy + 20, 8, 12);
       ctx.fillStyle = "#241a0c";
       ctx.fillRect(sx + 17, sy + 20, 3, 12);
-      ctx.fillStyle = "#48381e";
+      ctx.fillStyle = "#54401e";
       ctx.fillRect(sx + 12, sy + 20, 2, 12);
-      // layered canopy: dark base, mid tone, sunlit top
+      // layered canopy: dark base, mid tone, sunlit top, bright rim
       ctx.fillStyle = "#1e2c18";
       ctx.fillRect(sx + 4, sy + 4, 24, 18);
       ctx.fillStyle = "#2a3a20";
       ctx.fillRect(sx + 8, sy + 2, 16, 8);
       ctx.fillRect(sx + 6, sy + 8, 8, 8);
-      ctx.fillStyle = "#364828";
+      ctx.fillStyle = "#3a4c2a";
       ctx.fillRect(sx + 10, sy + 4, 8, 4);
       ctx.fillRect(sx + 8, sy + 10, 4, 4);
+      ctx.fillStyle = "#4c6034";
+      ctx.fillRect(sx + 12, sy + 2, 6, 2);
+      ctx.fillRect(sx + 10, sy + 5, 4, 2);
+      // dithered light falling through the leaves
+      ditherRect("#324424", sx + 6, sy + 6, 20, 8, wx & 1);
       // deterministic leaf speckles
       for (let i = 0; i < 4; i++) {
-        ctx.fillStyle = hashNoise(wx, wy, i + 90) > 0.5 ? "#405430" : "#141e10";
+        ctx.fillStyle = hashNoise(wx, wy, i + 90) > 0.5 ? "#4c6034" : "#141e10";
         ctx.fillRect(sx + 6 + ((hashNoise(wx, wy, i + 95) * 10) | 0) * 2,
                      sy + 5 + ((hashNoise(wx, wy, i + 100) * 7) | 0) * 2, 2, 2);
       }
@@ -443,8 +480,9 @@ function drawTile(type, sx, sy, wx, wy) {
     }
     case T_WATER: { // water
       // deep-to-shallow banding for a sense of depth
-      ctx.fillStyle = "#122430";
+      ctx.fillStyle = "#14283a";
       ctx.fillRect(sx, sy, TILE, TILE);
+      ditherRect("#0e1e2c", sx, sy + 16, TILE, 16, wx & 1);
       ctx.fillStyle = "#0c1a24";
       for (let i = 0; i < 3; i++) {
         ctx.fillRect(sx + ((hashNoise(wx, wy, i + 30) * 12) | 0) * 2,
@@ -453,25 +491,32 @@ function drawTile(type, sx, sy, wx, wy) {
       const ph = (Date.now() / 600 + wx + wy) | 0;
       for (let i = 0; i < 4; i++) {
         const n = hashNoise(wx, wy, i + ph % 3);
-        ctx.fillStyle = "#22404e";
+        ctx.fillStyle = "#26485c";
         ctx.fillRect(sx + ((n * 12) | 0) * 2, sy + ((hashNoise(wx, wy, i + 9) * 14) | 0) * 2, 8, 2);
       }
-      // animated glints riding the wave crests
+      // animated glints riding the wave crests, with bright sparkle cores
       for (let i = 0; i < 2; i++) {
         const n = hashNoise(wx, wy, i + 5 + ph % 3);
-        ctx.fillStyle = "#48687a";
-        ctx.fillRect(sx + ((n * 13) | 0) * 2, sy + ((hashNoise(wx, wy, i + 15) * 14) | 0) * 2, 4, 2);
+        const gx = sx + ((n * 13) | 0) * 2, gy = sy + ((hashNoise(wx, wy, i + 15) * 14) | 0) * 2;
+        ctx.fillStyle = "#4e7690";
+        ctx.fillRect(gx, gy, 6, 2);
+        ctx.fillStyle = "#7ea4ba";
+        ctx.fillRect(gx + 2, gy, 2, 2);
       }
       break;
     }
     case T_MOUNTAIN: { // solid rock block
       ctx.fillStyle = "#3c3c44";
       ctx.fillRect(sx, sy, TILE, TILE);
-      // chunky stone facets
+      ditherRect("#34343c", sx, sy + 18, TILE, 14, wx & 1);
+      // chunky stone facets with lit top edges
       for (let i = 0; i < 5; i++) {
-        ctx.fillStyle = hashNoise(wx, wy, i + 110) > 0.5 ? "#4a4a54" : "#30303a";
-        ctx.fillRect(sx + ((hashNoise(wx, wy, i + 115) * 12) | 0) * 2,
-                     sy + ((hashNoise(wx, wy, i + 120) * 12) | 0) * 2, 8, 6);
+        const fx = sx + ((hashNoise(wx, wy, i + 115) * 12) | 0) * 2;
+        const fy = sy + ((hashNoise(wx, wy, i + 120) * 12) | 0) * 2;
+        const lit = hashNoise(wx, wy, i + 110) > 0.5;
+        ctx.fillStyle = lit ? "#4c4c56" : "#30303a";
+        ctx.fillRect(fx, fy, 8, 6);
+        if (lit) { ctx.fillStyle = "#5c5c68"; ctx.fillRect(fx, fy, 8, 2); }
       }
       // crevice lines
       ctx.fillStyle = "#26262e";
@@ -480,15 +525,22 @@ function drawTile(type, sx, sy, wx, wy) {
         ctx.fillRect(sx + ((hashNoise(wx, wy, 126) * 12) | 0) * 2 + 4, sy + 16, 2, 8);
       }
       // top-edge highlight
-      ctx.fillStyle = "#54545e";
-      ctx.fillRect(sx, sy, TILE, 3);
+      ctx.fillStyle = "#60606c";
+      ctx.fillRect(sx, sy, TILE, 2);
+      ctx.fillStyle = "#50505c";
+      ctx.fillRect(sx, sy + 2, TILE, 2);
       break;
     }
     case T_FLOOR: { // dungeon room/corridor air (carved-out space)
       ctx.fillStyle = "#26202c";
       ctx.fillRect(sx, sy, TILE, TILE);
-      ctx.fillStyle = "#2e2836";
-      if (hashNoise(wx, wy, 3) > 0.6) ctx.fillRect(sx + 8, sy + 8, 6, 6);
+      ditherRect("#1e1826", sx, sy + 16, TILE, 16, wx & 1);
+      ctx.fillStyle = "#322a3a";
+      if (hashNoise(wx, wy, 3) > 0.6) {
+        ctx.fillRect(sx + 8, sy + 8, 6, 6);
+        ctx.fillStyle = "#3e3448";
+        ctx.fillRect(sx + 8, sy + 8, 6, 2);
+      }
       // cracks and pebbles worn into the flagstones
       const cn = hashNoise(wx, wy, 130);
       if (cn > 0.7) {
@@ -499,7 +551,7 @@ function drawTile(type, sx, sy, wx, wy) {
         ctx.fillRect(cx2 + 4, cy2 + 2, 2, 4);
       }
       if (hashNoise(wx, wy, 135) > 0.75) {
-        ctx.fillStyle = "#38303e";
+        ctx.fillStyle = "#443a4e";
         ctx.fillRect(sx + ((hashNoise(wx, wy, 136) * 13) | 0) * 2,
                      sy + ((hashNoise(wx, wy, 137) * 13) | 0) * 2, 2, 2);
       }
@@ -510,13 +562,20 @@ function drawTile(type, sx, sy, wx, wy) {
     case T_WALL: { // dungeon wall
       ctx.fillStyle = "#100c16";
       ctx.fillRect(sx, sy, TILE, TILE);
-      ctx.fillStyle = "#201826";
+      // bricks with a mid tone plus per-brick shading
+      ctx.fillStyle = "#221a2a";
       ctx.fillRect(sx + 1, sy + 1, 14, 6); ctx.fillRect(sx + 17, sy + 1, 14, 6);
       ctx.fillRect(sx + 1, sy + 9, 6, 6); ctx.fillRect(sx + 9, sy + 9, 22, 6);
       ctx.fillRect(sx + 1, sy + 17, 14, 6); ctx.fillRect(sx + 17, sy + 17, 14, 6);
       ctx.fillRect(sx + 1, sy + 25, 6, 6); ctx.fillRect(sx + 9, sy + 25, 22, 6);
+      // shaded lower edge of each brick
+      ctx.fillStyle = "#1a1220";
+      ctx.fillRect(sx + 1, sy + 5, 14, 2); ctx.fillRect(sx + 17, sy + 5, 14, 2);
+      ctx.fillRect(sx + 1, sy + 13, 6, 2); ctx.fillRect(sx + 9, sy + 13, 22, 2);
+      ctx.fillRect(sx + 1, sy + 21, 14, 2); ctx.fillRect(sx + 17, sy + 21, 14, 2);
+      ctx.fillRect(sx + 1, sy + 29, 6, 2); ctx.fillRect(sx + 9, sy + 29, 22, 2);
       // top-edge highlight on each brick to catch torchlight
-      ctx.fillStyle = "#282034";
+      ctx.fillStyle = "#322842";
       ctx.fillRect(sx + 1, sy + 1, 14, 2); ctx.fillRect(sx + 17, sy + 1, 14, 2);
       ctx.fillRect(sx + 1, sy + 9, 6, 2); ctx.fillRect(sx + 9, sy + 9, 22, 2);
       ctx.fillRect(sx + 1, sy + 17, 14, 2); ctx.fillRect(sx + 17, sy + 17, 14, 2);
@@ -528,22 +587,25 @@ function drawTile(type, sx, sy, wx, wy) {
                      sy + ((hashNoise(wx, wy, 142) * 3) | 0) * 8 + 3, 4, 2);
       }
       if (hashNoise(wx, wy, 145) > 0.85) {
-        ctx.fillStyle = "#1e2c20";
+        ctx.fillStyle = "#243626";
         ctx.fillRect(sx + ((hashNoise(wx, wy, 146) * 12) | 0) * 2 + 2,
                      sy + ((hashNoise(wx, wy, 147) * 3) | 0) * 8 + 4, 4, 2);
       }
       break;
     }
     case T_SAND: { // sand/path
-      ctx.fillStyle = "#786650";
+      ctx.fillStyle = "#7c6a52";
       ctx.fillRect(sx, sy, TILE, TILE);
+      ctx.fillStyle = "#8a7860";
+      ctx.fillRect(sx, sy, TILE, 3);
+      ditherRect("#6e5c46", sx, sy + 18, TILE, 14, wx & 1);
       for (let i = 0; i < 4; i++) {
         ctx.fillStyle = "#685840";
         ctx.fillRect(sx + ((hashNoise(wx, wy, i) * 14) | 0) * 2, sy + ((hashNoise(wx, wy, i + 20) * 14) | 0) * 2, 4, 2);
       }
       // lighter wind-blown grains and the odd pebble
       for (let i = 0; i < 3; i++) {
-        ctx.fillStyle = "#8a7860";
+        ctx.fillStyle = "#9a8870";
         ctx.fillRect(sx + ((hashNoise(wx, wy, i + 150) * 14) | 0) * 2,
                      sy + ((hashNoise(wx, wy, i + 155) * 14) | 0) * 2, 2, 2);
       }
@@ -551,7 +613,7 @@ function drawTile(type, sx, sy, wx, wy) {
         ctx.fillStyle = "#524430";
         ctx.fillRect(sx + ((hashNoise(wx, wy, 161) * 12) | 0) * 2 + 2,
                      sy + ((hashNoise(wx, wy, 162) * 12) | 0) * 2 + 2, 4, 4);
-        ctx.fillStyle = "#605038";
+        ctx.fillStyle = "#6a583e";
         ctx.fillRect(sx + ((hashNoise(wx, wy, 161) * 12) | 0) * 2 + 2,
                      sy + ((hashNoise(wx, wy, 162) * 12) | 0) * 2 + 2, 4, 2);
       }
@@ -564,20 +626,28 @@ function drawTile(type, sx, sy, wx, wy) {
       ctx.moveTo(sx, sy + 32); ctx.lineTo(sx + 6, sy + 8); ctx.lineTo(sx + 16, sy + 2);
       ctx.lineTo(sx + 26, sy + 8); ctx.lineTo(sx + 32, sy + 32);
       ctx.fill();
-      ctx.fillStyle = "#4a4a54";
+      ctx.fillStyle = "#50505c";
       ctx.fillRect(sx + 10, sy + 4, 12, 4);
       ctx.fillRect(sx + 6, sy + 10, 6, 4);
+      ctx.fillStyle = "#606070";
+      ctx.fillRect(sx + 12, sy + 4, 8, 2);
+      // shaded right flank of the mound
+      ctx.fillStyle = "#32323a";
+      ctx.fillRect(sx + 26, sy + 12, 4, 20);
       // rocky rim framing the opening
-      ctx.fillStyle = "#5e5e6a";
+      ctx.fillStyle = "#666676";
       ctx.fillRect(sx + 8, sy + 12, 16, 2);
+      ctx.fillStyle = "#5e5e6a";
       ctx.fillRect(sx + 8, sy + 14, 2, 18);
       ctx.fillRect(sx + 22, sy + 14, 2, 18);
       ctx.fillStyle = "#000";
       ctx.fillRect(sx + 10, sy + 14, 12, 18);
       ctx.fillRect(sx + 12, sy + 10, 8, 6);
       // faint inner gloom so the entrance reads as deep
-      ctx.fillStyle = "#0c0c12";
+      ctx.fillStyle = "#12121a";
       ctx.fillRect(sx + 10, sy + 14, 12, 2);
+      ctx.fillStyle = "#0a0a10";
+      ctx.fillRect(sx + 10, sy + 16, 12, 2);
       break;
     }
     case T_TOWN: { // town house standing on the ground below (sky behind)
@@ -587,41 +657,59 @@ function drawTile(type, sx, sy, wx, wy) {
       ctx.beginPath();
       ctx.moveTo(sx + 2, sy + 14); ctx.lineTo(sx + 16, sy + 2); ctx.lineTo(sx + 30, sy + 14);
       ctx.fill();
-      ctx.fillStyle = "#743a2c";
+      ctx.fillStyle = "#7c4030";
       ctx.beginPath();
       ctx.moveTo(sx + 8, sy + 9); ctx.lineTo(sx + 16, sy + 2); ctx.lineTo(sx + 24, sy + 9);
       ctx.fill();
+      ctx.fillStyle = "#94523a";
+      ctx.fillRect(sx + 14, sy + 3, 4, 2);
       ctx.fillStyle = "#3c1810";
       ctx.fillRect(sx + 2, sy + 12, 28, 2);
       // chimney
-      ctx.fillStyle = "#3e3438";
+      ctx.fillStyle = "#484048";
       ctx.fillRect(sx + 22, sy + 3, 4, 7);
+      ctx.fillStyle = "#585058";
+      ctx.fillRect(sx + 22, sy + 3, 4, 2);
       // walls with timber framing, door, and lit window
-      ctx.fillStyle = "#7a6a4e";
+      ctx.fillStyle = "#84745a";
       ctx.fillRect(sx + 6, sy + 14, 20, 18);
+      ctx.fillStyle = "#948468";
+      ctx.fillRect(sx + 7, sy + 15, 18, 2);
       ctx.fillStyle = "#4c3c26";
       ctx.fillRect(sx + 6, sy + 14, 20, 1);
       ctx.fillRect(sx + 6, sy + 14, 1, 18);
       ctx.fillRect(sx + 25, sy + 14, 1, 18);
       ctx.fillStyle = "#2a1e12";
       ctx.fillRect(sx + 13, sy + 20, 6, 12);
-      ctx.fillStyle = "#907022";
+      ctx.fillStyle = "#3a2c1a";
+      ctx.fillRect(sx + 13, sy + 20, 6, 2);
+      ctx.fillStyle = "#b09040";
       ctx.fillRect(sx + 17, sy + 26, 1, 1); // door handle
-      ctx.fillStyle = "#a88838";
+      ctx.fillStyle = "#c8a850";
       ctx.fillRect(sx + 21, sy + 18, 3, 3); // warm window glow
+      ctx.fillStyle = "#e8cc78";
+      ctx.fillRect(sx + 22, sy + 18, 1, 1);
       break;
     }
-    case T_SKY: { // open sky with drifting cloud wisps
-      ctx.fillStyle = "#4a525e";
+    case T_SKY: { // banded sky gradient, lighter toward the horizon, with clouds
+      const band = skyBand(wy);
+      ctx.fillStyle = SKY_BANDS[band];
       ctx.fillRect(sx, sy, TILE, TILE);
+      // dither the seam into the next band so the gradient reads as smooth
+      if (band + 1 < SKY_BANDS.length) {
+        ditherRect(SKY_BANDS[band + 1], sx, sy + 24, TILE, 8, wx & 1);
+      }
       const cn = hashNoise(wx, wy, 170);
       if (cn > 0.82) {
         const cx2 = sx + ((hashNoise(wx, wy, 171) * 8) | 0) * 2;
         const cy2 = sy + ((hashNoise(wx, wy, 172) * 10) | 0) * 2;
-        ctx.fillStyle = "#666e7a";
+        // puffy three-shade cloud: bright crown, mid body, shaded base
+        ctx.fillStyle = "#78808c";
         ctx.fillRect(cx2, cy2 + 2, 16, 4);
         ctx.fillRect(cx2 + 4, cy2, 8, 2);
-        ctx.fillStyle = "#565e6a";
+        ctx.fillStyle = "#8a929e";
+        ctx.fillRect(cx2 + 6, cy2, 4, 2);
+        ctx.fillStyle = "#5e6674";
         ctx.fillRect(cx2, cy2 + 6, 16, 2);
       }
       break;
@@ -629,8 +717,9 @@ function drawTile(type, sx, sy, wx, wy) {
     case T_DIRT: { // underground earth block
       ctx.fillStyle = "#3c2c1a";
       ctx.fillRect(sx, sy, TILE, TILE);
+      ditherRect("#322414", sx, sy + 16, TILE, 16, wx & 1);
       for (let i = 0; i < 6; i++) {
-        ctx.fillStyle = hashNoise(wx, wy, i + 180) > 0.5 ? "#463420" : "#2c2012";
+        ctx.fillStyle = hashNoise(wx, wy, i + 180) > 0.5 ? "#4c3a24" : "#2c2012";
         ctx.fillRect(sx + ((hashNoise(wx, wy, i + 185) * 14) | 0) * 2,
                      sy + ((hashNoise(wx, wy, i + 190) * 14) | 0) * 2, 6, 4);
       }
@@ -639,6 +728,9 @@ function drawTile(type, sx, sy, wx, wy) {
         ctx.fillStyle = "#565656";
         ctx.fillRect(sx + ((hashNoise(wx, wy, 196) * 11) | 0) * 2 + 2,
                      sy + ((hashNoise(wx, wy, 197) * 11) | 0) * 2 + 2, 6, 4);
+        ctx.fillStyle = "#6a6a6a";
+        ctx.fillRect(sx + ((hashNoise(wx, wy, 196) * 11) | 0) * 2 + 2,
+                     sy + ((hashNoise(wx, wy, 197) * 11) | 0) * 2 + 2, 6, 2);
       }
       break;
     }
