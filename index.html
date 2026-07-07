@@ -144,6 +144,7 @@
    ============================================================ */
 
 const TILE = 32, VIEW = 15;           // 15x15 tiles of 32px = 480px
+const MOVE_MS = 140;                  // duration of the tile-to-tile walk animation
 const COMBAT_DELAY_MS = 700;          // pause before the monster acts
 const RANDOM_ENCOUNTER_CHANCE = 0.03; // per-step ambush chance in dungeons
 const POTION_COST = 25, MAX_POTIONS = 5;
@@ -487,11 +488,11 @@ const CLASSES = {
 
 // ---------- Monsters ----------
 const MONSTERS = {
-  goblin:   { name: "Goblin",        spr: "goblin",   hp: [2, 6, 2],  ac: 13, atk: 4, dmg: [1, 6, 2],  xp: 50,  cr: 1 },
-  wolf:     { name: "Dire Wolf",     spr: "wolf",     hp: [3, 8, 3],  ac: 13, atk: 5, dmg: [1, 8, 3],  xp: 90,  cr: 2 },
-  skeleton: { name: "Skeleton",      spr: "skeleton", hp: [2, 8, 4],  ac: 13, atk: 4, dmg: [1, 6, 2],  xp: 70,  cr: 1 },
-  orc:      { name: "Orc Warrior",   spr: "orc",      hp: [4, 8, 6],  ac: 14, atk: 6, dmg: [1, 12, 3], xp: 150, cr: 3 },
-  dragon:   { name: "Young Dragon",  spr: "dragon",   hp: [8, 10, 16],ac: 17, atk: 8, dmg: [2, 10, 4], xp: 600, cr: 6, boss: true },
+  goblin:   { name: "Goblin",        spr: "goblin",   hp: [3, 6, 3],   ac: 13, atk: 4, dmg: [1, 4, 1],  xp: 50,  cr: 1 },
+  wolf:     { name: "Dire Wolf",     spr: "wolf",     hp: [4, 8, 4],   ac: 13, atk: 5, dmg: [1, 6, 1],  xp: 90,  cr: 2 },
+  skeleton: { name: "Skeleton",      spr: "skeleton", hp: [3, 8, 4],   ac: 13, atk: 4, dmg: [1, 4, 1],  xp: 70,  cr: 1 },
+  orc:      { name: "Orc Warrior",   spr: "orc",      hp: [5, 8, 8],   ac: 14, atk: 6, dmg: [1, 8, 2],  xp: 150, cr: 3 },
+  dragon:   { name: "Young Dragon",  spr: "dragon",   hp: [10, 10, 20],ac: 17, atk: 8, dmg: [2, 8, 3],  xp: 600, cr: 6, boss: true },
 };
 
 // ---------- World generation ----------
@@ -544,6 +545,7 @@ const G = {
   area: "overworld",   // overworld | dungeon1 | dungeon2 ...
   dungeonLevel: 0,
   px: 0, py: 0,
+  moveAnim: null,      // {fx, fy, t0}: slide from (fx,fy) to (px,py) started at t0
   entities: [],        // {x, y, kind:"monster"/"chest"/"stairs"/"entrance"/"town", type}
   overworldState: null,
   player: null,
@@ -564,8 +566,9 @@ function newPlayer(classKey, stats) {
     name: c.name,
     stats,
     level: 1,
-    hpMax: c.hd + conMod,
-    hp: c.hd + conMod,
+    // 2x hit die + CON so level-1 heroes survive several hits instead of one
+    hpMax: c.hd * 2 + conMod,
+    hp: c.hd * 2 + conMod,
     xp: 0,
     xpNext: 300,
     ac: c.ac + (classKey === "rogue" ? mod(stats.dex) : 0),
@@ -619,6 +622,7 @@ function enterOverworld() {
   }
   G.area = "overworld";
   G.dungeonLevel = 0;
+  G.moveAnim = null;
 }
 
 function saveOverworld() {
@@ -637,6 +641,7 @@ function enterDungeon(depth) {
   const rnd = makeLCG(G.seed + depth * 777);
   const start = carved[0];
   G.px = start[0]; G.py = start[1];
+  G.moveAnim = null;
   // exit stairs at far end
   const end = carved[carved.length - 1];
   G.entities.push({ x: end[0], y: end[1], kind: "stairs" });
@@ -836,6 +841,7 @@ function levelUp() {
 
 // ---------- Exploration ----------
 function tryMove(dx, dy) {
+  if (G.moveAnim) return; // still sliding to the previous tile
   const nx = G.px + dx, ny = G.py + dy;
   if (nx < 0 || ny < 0 || nx >= MAP_W || ny >= MAP_H) return;
   const t = G.map[ny][nx];
@@ -858,6 +864,7 @@ function tryMove(dx, dy) {
   }
   if (SOLID[t]) return;
 
+  G.moveAnim = { fx: G.px, fy: G.py, t0: performance.now() };
   G.px = nx; G.py = ny;
 
   if (t === T_CAVE) { // dungeon entrance
@@ -945,27 +952,40 @@ function render() {
   if (G.mode === "combat") { renderCombat(); return; }
 
   // explore / gameover / victory: draw world
+  // Interpolate the player (and camera) between tiles for smooth movement.
+  let ipx = G.px, ipy = G.py;
+  if (G.moveAnim) {
+    const e = (performance.now() - G.moveAnim.t0) / MOVE_MS;
+    if (e >= 1) G.moveAnim = null;
+    else {
+      ipx = G.moveAnim.fx + (G.px - G.moveAnim.fx) * e;
+      ipy = G.moveAnim.fy + (G.py - G.moveAnim.fy) * e;
+    }
+  }
   const half = VIEW >> 1;
-  let camX = Math.max(0, Math.min(MAP_W - VIEW, G.px - half));
-  let camY = Math.max(0, Math.min(MAP_H - VIEW, G.py - half));
-  for (let vy = 0; vy < VIEW; vy++) {
-    for (let vx = 0; vx < VIEW; vx++) {
-      const wx = camX + vx, wy = camY + vy;
-      drawTile(G.map[wy][wx], vx * TILE, vy * TILE, wx, wy);
+  const camX = Math.max(0, Math.min(MAP_W - VIEW, ipx - half));
+  const camY = Math.max(0, Math.min(MAP_H - VIEW, ipy - half));
+  const cx0 = Math.floor(camX), cy0 = Math.floor(camY);
+  const offX = Math.round((camX - cx0) * TILE), offY = Math.round((camY - cy0) * TILE);
+  for (let vy = 0; vy <= VIEW; vy++) {
+    for (let vx = 0; vx <= VIEW; vx++) {
+      const wx = cx0 + vx, wy = cy0 + vy;
+      if (wx >= MAP_W || wy >= MAP_H) continue;
+      drawTile(G.map[wy][wx], vx * TILE - offX, vy * TILE - offY, wx, wy);
     }
   }
   for (const e of G.entities) {
-    const vx = e.x - camX, vy = e.y - camY;
-    if (vx < 0 || vy < 0 || vx >= VIEW || vy >= VIEW) continue;
+    const vx = e.x - cx0, vy = e.y - cy0;
+    if (vx < 0 || vy < 0 || vx > VIEW || vy > VIEW) continue;
     let spr = null;
     if (e.kind === "monster") spr = SPRITES[MONSTERS[e.type].spr];
     else if (e.kind === "chest") spr = SPRITES.chest;
     else if (e.kind === "stairs") spr = SPRITES.stairs;
-    if (spr) ctx.drawImage(spr, vx * TILE, vy * TILE);
+    if (spr) ctx.drawImage(spr, vx * TILE - offX, vy * TILE - offY);
   }
   // player with idle bob
   const bob = (G.tick >> 4) % 2;
-  ctx.drawImage(SPRITES[G.player.cls], (G.px - camX) * TILE, (G.py - camY) * TILE - bob);
+  ctx.drawImage(SPRITES[G.player.cls], Math.round((ipx - camX) * TILE), Math.round((ipy - camY) * TILE) - bob);
 
   // area label
   ctx.fillStyle = "rgba(0,0,0,0.6)";
