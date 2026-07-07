@@ -24,6 +24,7 @@
     border: 4px solid #6b4a2a;
     background: #000;
     outline: none;
+    box-sizing: content-box;
   }
   #side {
     width: 280px;
@@ -54,7 +55,6 @@
   #xpbar > div { background: linear-gradient(#50a0e0, #204880); }
   #controls { font-size: 11px; color: #a08868; }
   kbd { background: #402810; padding: 0 4px; border-radius: 3px; color: #f0c060; }
-  canvas { max-width: 100%; height: auto; }
   /* Touch controls: shown only on touch (coarse-pointer) devices */
   #touch-controls {
     display: none;
@@ -1171,6 +1171,32 @@ document.querySelectorAll("#touch-controls button").forEach((btn) => {
 
 cv.focus();
 cv.addEventListener("click", () => cv.focus());
+
+// Fit the canvas to the screen. CSS-only scaling (max-width: 100%) yields
+// non-integer scale factors on phones, which makes pixelated rendering look
+// rough and uneven. Instead, snap the displayed size so every canvas pixel
+// maps to a whole number of device pixels; when integer snapping would waste
+// too much screen (or the screen is smaller than 1:1 device pixels), fall
+// back to smooth downscaling, which looks far better than rough pixelation.
+function fitCanvas() {
+  const dpr = window.devicePixelRatio || 1;
+  const border = 8, bodyPad = 20; // canvas border (4px x2) + body padding (10px x2)
+  const avail = Math.min(480, document.documentElement.clientWidth - bodyPad - border);
+  const devicePx = Math.floor((avail * dpr) / cv.width) * cv.width;
+  const crispCss = devicePx / dpr;
+  if (devicePx >= cv.width && crispCss >= 0.8 * avail) {
+    cv.style.width = crispCss + "px";
+    cv.style.height = crispCss + "px";
+    cv.style.imageRendering = "pixelated";
+  } else {
+    cv.style.width = avail + "px";
+    cv.style.height = avail + "px";
+    cv.style.imageRendering = "auto";
+  }
+}
+window.addEventListener("resize", fitCanvas);
+window.addEventListener("orientationchange", fitCanvas);
+fitCanvas();
 
 (function loop() {
   render();
