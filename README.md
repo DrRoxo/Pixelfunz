@@ -8,7 +8,7 @@ No build steps, no dependencies, no external assets — all pixel art is drawn p
 
 1. Open `index.html` in any modern browser.
 2. Press **Enter**, pick a class (Fighter, Rogue, Wizard, or Cleric), and roll your ability scores (4d6 drop lowest — press **R** to reroll).
-3. Walk, climb, and swim across the rolling overworld, loot chests, and enter the cave entrances to descend into cavernous dungeons.
+3. Walk across the flat overworld, loot chests, and enter the cave entrances to descend into dungeon-crawler levels of rooms and corridors.
 4. Slay the **Young Dragon** in Dungeon 3 to win!
 
 Works on mobile too: on touch devices an on-screen D-pad and action buttons appear automatically.

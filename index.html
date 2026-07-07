@@ -140,8 +140,8 @@
 "use strict";
 /* ============================================================
    PIXELFUNZ — a D&D-style pixel art RPG in a single file.
-   Side-scrolling view: walk, climb, and swim across a rolling
-   overworld and descend into cavernous dungeons.
+   Side-scrolling view: walk across a flat overworld and descend
+   into dungeon-crawler levels of rooms and corridors.
    All art is drawn procedurally on canvas. No external assets.
    ============================================================ */
 
@@ -482,7 +482,7 @@ function drawTile(type, sx, sy, wx, wy) {
       ctx.fillRect(sx, sy, TILE, 3);
       break;
     }
-    case T_FLOOR: { // dungeon cavern air (carved-out space)
+    case T_FLOOR: { // dungeon room/corridor air (carved-out space)
       ctx.fillStyle = "#3a3242";
       ctx.fillRect(sx, sy, TILE, TILE);
       ctx.fillStyle = "#443a4e";
@@ -1052,7 +1052,7 @@ function applyGravity() {
   return fell;
 }
 // You can climb up when grounded (a hop) or holding onto an adjacent wall.
-// Cavern walls are rough rock: inside dungeons you can always climb.
+// Dungeon walls are rough stone: inside dungeons you can always climb.
 function canClimb() {
   return G.dungeonLevel > 0 || supportedAt(G.px, G.py) ||
          solidAt(G.px - 1, G.py) || solidAt(G.px + 1, G.py) ||
