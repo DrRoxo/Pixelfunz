@@ -72,7 +72,7 @@
     </div>
     <div class="panel">
       <h3>Adventure Log</h3>
-      <div id="log"></div>
+      <div id="log" aria-live="polite"></div>
     </div>
     <div class="panel" id="controls">
       <kbd>&#8592;&#8593;&#8595;&#8594;</kbd>/<kbd>WASD</kbd> move &middot; <kbd>1-4</kbd> combat actions &middot; <kbd>Enter</kbd> confirm &middot; <kbd>H</kbd> drink potion
@@ -87,6 +87,11 @@
    ============================================================ */
 
 const TILE = 32, VIEW = 15;           // 15x15 tiles of 32px = 480px
+const COMBAT_DELAY_MS = 700;          // pause before the monster acts
+const RANDOM_ENCOUNTER_CHANCE = 0.03; // per-step ambush chance in dungeons
+// Tile type IDs
+const T_GRASS = 0, T_TREE = 1, T_WATER = 2, T_MOUNTAIN = 3, T_FLOOR = 4,
+      T_WALL = 5, T_SAND = 6, T_CAVE = 7, T_TOWN = 8;
 const cv = document.getElementById("c");
 const ctx = cv.getContext("2d");
 ctx.imageSmoothingEnabled = false;
@@ -305,6 +310,8 @@ SPRITES.stairs = makeSprite([
 ]);
 
 // --- Tiles drawn procedurally (deterministic noise) ---
+// Deterministic 2D hash noise: large odd multiplicative constants + xorshift
+// mixing produce a uniform pseudo-random value in [0, 1) for a given cell/seed.
 function hashNoise(x, y, s) {
   let h = (x * 374761393 + y * 668265263 + s * 1274126177) | 0;
   h = ((h ^ (h >> 13)) * 1274126177) | 0;
@@ -312,7 +319,7 @@ function hashNoise(x, y, s) {
 }
 function drawTile(type, sx, sy, wx, wy) {
   switch (type) {
-    case 0: { // grass
+    case T_GRASS: { // grass
       ctx.fillStyle = "#2f7a38";
       ctx.fillRect(sx, sy, TILE, TILE);
       for (let i = 0; i < 6; i++) {
@@ -323,8 +330,8 @@ function drawTile(type, sx, sy, wx, wy) {
       }
       break;
     }
-    case 1: { // tree
-      drawTile(0, sx, sy, wx, wy);
+    case T_TREE: { // tree
+      drawTile(T_GRASS, sx, sy, wx, wy);
       ctx.fillStyle = "#5a4020";
       ctx.fillRect(sx + 12, sy + 20, 8, 10);
       ctx.fillStyle = "#1c5228";
@@ -334,7 +341,7 @@ function drawTile(type, sx, sy, wx, wy) {
       ctx.fillRect(sx + 6, sy + 8, 8, 8);
       break;
     }
-    case 2: { // water
+    case T_WATER: { // water
       ctx.fillStyle = "#1e4a8a";
       ctx.fillRect(sx, sy, TILE, TILE);
       const ph = (Date.now() / 600 + wx + wy) | 0;
@@ -345,7 +352,7 @@ function drawTile(type, sx, sy, wx, wy) {
       }
       break;
     }
-    case 3: { // mountain
+    case T_MOUNTAIN: { // mountain
       ctx.fillStyle = "#5a5a66";
       ctx.fillRect(sx, sy, TILE, TILE);
       ctx.fillStyle = "#78788a";
@@ -356,7 +363,7 @@ function drawTile(type, sx, sy, wx, wy) {
       ctx.fillRect(sx + 13, sy + 6, 6, 4);
       break;
     }
-    case 4: { // dungeon floor
+    case T_FLOOR: { // dungeon floor
       ctx.fillStyle = "#3a3242";
       ctx.fillRect(sx, sy, TILE, TILE);
       ctx.fillStyle = "#443a4e";
@@ -365,7 +372,7 @@ function drawTile(type, sx, sy, wx, wy) {
       ctx.strokeRect(sx + 0.5, sy + 0.5, TILE - 1, TILE - 1);
       break;
     }
-    case 5: { // dungeon wall
+    case T_WALL: { // dungeon wall
       ctx.fillStyle = "#1a1422";
       ctx.fillRect(sx, sy, TILE, TILE);
       ctx.fillStyle = "#2e2438";
@@ -375,7 +382,7 @@ function drawTile(type, sx, sy, wx, wy) {
       ctx.fillRect(sx + 1, sy + 25, 6, 6); ctx.fillRect(sx + 9, sy + 25, 22, 6);
       break;
     }
-    case 6: { // sand/path
+    case T_SAND: { // sand/path
       ctx.fillStyle = "#c8a860";
       ctx.fillRect(sx, sy, TILE, TILE);
       for (let i = 0; i < 4; i++) {
@@ -384,15 +391,15 @@ function drawTile(type, sx, sy, wx, wy) {
       }
       break;
     }
-    case 7: { // dungeon entrance (cave)
-      drawTile(3, sx, sy, wx, wy);
+    case T_CAVE: { // dungeon entrance (cave)
+      drawTile(T_MOUNTAIN, sx, sy, wx, wy);
       ctx.fillStyle = "#000";
       ctx.fillRect(sx + 10, sy + 14, 12, 14);
       ctx.fillRect(sx + 12, sy + 10, 8, 6);
       break;
     }
-    case 8: { // town
-      drawTile(0, sx, sy, wx, wy);
+    case T_TOWN: { // town
+      drawTile(T_GRASS, sx, sy, wx, wy);
       ctx.fillStyle = "#a04030";
       ctx.beginPath();
       ctx.moveTo(sx + 2, sy + 14); ctx.lineTo(sx + 16, sy + 2); ctx.lineTo(sx + 30, sy + 14);
@@ -405,7 +412,7 @@ function drawTile(type, sx, sy, wx, wy) {
     }
   }
 }
-const SOLID = { 1: true, 2: true, 3: true, 5: true };
+const SOLID = { [T_TREE]: true, [T_WATER]: true, [T_MOUNTAIN]: true, [T_WALL]: true };
 
 // ---------- Classes (D&D style) ----------
 const CLASSES = {
@@ -432,12 +439,12 @@ function genOverworld(seed) {
     m.push([]);
     for (let x = 0; x < MAP_W; x++) {
       const n = hashNoise(x >> 2, y >> 2, seed) * 0.6 + hashNoise(x, y, seed + 1) * 0.4;
-      let t = 0;
-      if (x === 0 || y === 0 || x === MAP_W - 1 || y === MAP_H - 1) t = 3;
-      else if (n < 0.18) t = 2;
-      else if (n < 0.24) t = 6;
-      else if (n > 0.82) t = 3;
-      else if (n > 0.68) t = 1;
+      let t = T_GRASS;
+      if (x === 0 || y === 0 || x === MAP_W - 1 || y === MAP_H - 1) t = T_MOUNTAIN;
+      else if (n < 0.18) t = T_WATER;
+      else if (n < 0.24) t = T_SAND;
+      else if (n > 0.82) t = T_MOUNTAIN;
+      else if (n > 0.68) t = T_TREE;
       m[y].push(t);
     }
   }
@@ -447,15 +454,16 @@ function genDungeon(seed, level) {
   const m = [];
   for (let y = 0; y < MAP_H; y++) {
     m.push([]);
-    for (let x = 0; x < MAP_W; x++) m[y].push(5);
+    for (let x = 0; x < MAP_W; x++) m[y].push(T_WALL);
   }
-  // drunkard's walk carving
+  // Drunkard's-walk carving using a simple LCG (glibc constants) for
+  // deterministic dungeon layouts per seed/level.
   let x = MAP_W >> 1, y = MAP_H >> 1, steps = 1400;
   let rngState = seed * 1000 + level;
   const rnd = () => { rngState = (rngState * 1103515245 + 12345) & 0x7fffffff; return rngState / 0x7fffffff; };
   const carved = [];
   while (steps-- > 0) {
-    m[y][x] = 4;
+    m[y][x] = T_FLOOR;
     carved.push([x, y]);
     const d = (rnd() * 4) | 0;
     if (d === 0 && x > 1) x--;
@@ -526,13 +534,13 @@ function enterOverworld() {
     G.entities = [];
     // town start
     let [tx, ty] = findOpenSpot(G.map, rnd);
-    G.map[ty][tx] = 8;
+    G.map[ty][tx] = T_TOWN;
     G.px = tx; G.py = ty + 1;
-    if (SOLID[G.map[G.py][G.px]]) G.map[G.py][G.px] = 0;
+    if (SOLID[G.map[G.py][G.px]]) G.map[G.py][G.px] = T_GRASS;
     // dungeon entrances
     for (let i = 0; i < 3; i++) {
       const [dx, dy] = findOpenSpot(G.map, rnd);
-      G.map[dy][dx] = 7;
+      G.map[dy][dx] = T_CAVE;
       G.entities.push({ x: dx, y: dy, kind: "entrance", depth: i + 1 });
     }
     // roaming monsters
@@ -620,7 +628,7 @@ function startCombat(monsterType, entRef) {
   log(`— ${M.name} attacks! —`, "sys");
   log(`Initiative: you ${pInit}, foe ${mInit}.`, "roll");
   G.combat.turn = pInit >= mInit ? "player" : "monster";
-  if (G.combat.turn === "monster") setTimeout(monsterTurn, 700);
+  if (G.combat.turn === "monster") setTimeout(monsterTurn, COMBAT_DELAY_MS);
 }
 
 function playerAttack(kind) {
@@ -701,7 +709,7 @@ function playerAttack(kind) {
 function endPlayerTurn() {
   if (!G.combat) return;
   G.combat.turn = "monster";
-  setTimeout(monsterTurn, 700);
+  setTimeout(monsterTurn, COMBAT_DELAY_MS);
 }
 
 function monsterTurn() {
@@ -792,13 +800,13 @@ function tryMove(dx, dy) {
 
   G.px = nx; G.py = ny;
 
-  if (t === 7) { // dungeon entrance
+  if (t === T_CAVE) { // dungeon entrance
     const e = G.entities.find(e2 => e2.kind === "entrance" && e2.x === nx && e2.y === ny);
     enterDungeon(e ? e.depth : 1);
     updateHUD();
     return;
   }
-  if (t === 8) { // town: rest
+  if (t === T_TOWN) { // town: rest
     const p = G.player;
     if (p.hp < p.hpMax || p.potions < 2) {
       p.hp = p.hpMax;
@@ -810,7 +818,7 @@ function tryMove(dx, dy) {
     return;
   }
   // random encounter in dungeons
-  if (G.dungeonLevel > 0 && Math.random() < 0.03) {
+  if (G.dungeonLevel > 0 && Math.random() < RANDOM_ENCOUNTER_CHANCE) {
     const pool = ["goblin", "skeleton", "wolf", "orc"];
     const type = pool[Math.min(pool.length - 1, (Math.random() * (2 + G.dungeonLevel)) | 0)];
     const wanderer = { x: nx, y: ny, kind: "monster", type };
