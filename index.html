@@ -1,0 +1,1102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pixelfunz — A D&D-Style Pixel RPG</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #1a1423;
+    color: #e8d8b0;
+    font-family: 'Courier New', monospace;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 10px;
+  }
+  h1 { color: #f0c060; text-shadow: 2px 2px #402810; letter-spacing: 3px; margin: 8px 0; }
+  #game-wrap { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  canvas {
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    border: 4px solid #6b4a2a;
+    background: #000;
+    outline: none;
+  }
+  #side {
+    width: 280px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .panel {
+    border: 3px solid #6b4a2a;
+    background: #241a2e;
+    padding: 8px;
+    font-size: 13px;
+  }
+  .panel h3 { color: #f0c060; font-size: 13px; margin-bottom: 4px; border-bottom: 1px solid #6b4a2a; }
+  #log {
+    height: 220px;
+    overflow-y: auto;
+    line-height: 1.5;
+  }
+  #log .roll { color: #8fd0ff; }
+  #log .dmg { color: #ff8f8f; }
+  #log .good { color: #9fe89f; }
+  #log .crit { color: #ffd700; font-weight: bold; }
+  #log .sys { color: #b09fd0; }
+  .bar { background: #402030; height: 12px; border: 1px solid #6b4a2a; margin: 2px 0 6px; }
+  .bar > div { height: 100%; transition: width 0.3s; }
+  #hpbar > div { background: linear-gradient(#e05050, #a02020); }
+  #xpbar > div { background: linear-gradient(#50a0e0, #204880); }
+  #controls { font-size: 11px; color: #a08868; }
+  kbd { background: #402810; padding: 0 4px; border-radius: 3px; color: #f0c060; }
+</style>
+</head>
+<body>
+<h1>&#9876; PIXELFUNZ &#9876;</h1>
+<div id="game-wrap">
+  <canvas id="c" width="480" height="480" tabindex="0"></canvas>
+  <div id="side">
+    <div class="panel" id="stats-panel">
+      <h3 id="pname">Adventurer</h3>
+      <div>HP: <span id="hptext"></span></div>
+      <div class="bar" id="hpbar"><div></div></div>
+      <div>XP: <span id="xptext"></span></div>
+      <div class="bar" id="xpbar"><div></div></div>
+      <div id="statline"></div>
+      <div id="invline"></div>
+    </div>
+    <div class="panel">
+      <h3>Adventure Log</h3>
+      <div id="log"></div>
+    </div>
+    <div class="panel" id="controls">
+      <kbd>&#8592;&#8593;&#8595;&#8594;</kbd>/<kbd>WASD</kbd> move &middot; <kbd>1-4</kbd> combat actions &middot; <kbd>Enter</kbd> confirm &middot; <kbd>H</kbd> drink potion
+    </div>
+  </div>
+</div>
+<script>
+"use strict";
+/* ============================================================
+   PIXELFUNZ — a D&D-style pixel art RPG in a single file.
+   All art is drawn procedurally on canvas. No external assets.
+   ============================================================ */
+
+const TILE = 32, VIEW = 15;           // 15x15 tiles of 32px = 480px
+const cv = document.getElementById("c");
+const ctx = cv.getContext("2d");
+ctx.imageSmoothingEnabled = false;
+
+// ---------- Dice ----------
+function roll(sides) { return 1 + Math.floor(Math.random() * sides); }
+function rollDice(n, sides, bonus = 0) {
+  let t = bonus;
+  for (let i = 0; i < n; i++) t += roll(sides);
+  return t;
+}
+function mod(stat) { return Math.floor((stat - 10) / 2); }
+function fmtMod(m) { return (m >= 0 ? "+" : "") + m; }
+function roll4d6DropLowest() {
+  const r = [roll(6), roll(6), roll(6), roll(6)].sort((a, b) => a - b);
+  return r[1] + r[2] + r[3];
+}
+
+// ---------- Log ----------
+const logEl = document.getElementById("log");
+function log(msg, cls) {
+  const d = document.createElement("div");
+  if (cls) d.className = cls;
+  d.textContent = msg;
+  logEl.appendChild(d);
+  while (logEl.children.length > 60) logEl.removeChild(logEl.firstChild);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+// ---------- Pixel sprite engine ----------
+// Sprites are 16x16 grids of palette indices, scaled 2x to 32px.
+const PAL = {
+  ".": null,        // transparent
+  "0": "#000000", "s": "#e8b888", "S": "#c08858", // skin
+  "h": "#6b3a1a", "H": "#3a2410",                 // hair
+  "r": "#c03030", "R": "#801818",                 // red
+  "b": "#3858c0", "B": "#203070",                 // blue
+  "g": "#38a048", "G": "#1f6030",                 // green
+  "y": "#e8c840", "Y": "#a88820",                 // gold
+  "w": "#e8e8e8", "W": "#a0a0b0",                 // white/steel
+  "m": "#888898", "M": "#505060",                 // metal
+  "p": "#9048c0", "P": "#582880",                 // purple
+  "k": "#403040", "K": "#201828",                 // dark
+  "n": "#8a6a3a", "N": "#5a4020",                 // brown
+  "o": "#e88030", "O": "#a05010",                 // orange
+  "e": "#c8e858", "E": "#7fa030",                 // sick green
+  "f": "#ff6820", "F": "#c03000",                 // fire
+  "q": "#d8d0c0", "Q": "#989080",                 // bone
+};
+function makeSprite(rows) {
+  const off = document.createElement("canvas");
+  off.width = 32; off.height = 32;
+  const c = off.getContext("2d");
+  for (let y = 0; y < 16; y++) {
+    for (let x = 0; x < 16; x++) {
+      const col = PAL[rows[y][x]];
+      if (col) { c.fillStyle = col; c.fillRect(x * 2, y * 2, 2, 2); }
+    }
+  }
+  return off;
+}
+
+const SPRITES = {};
+
+// --- Hero sprites per class (fighter red, wizard purple, rogue dark, cleric white) ---
+function heroSprite(a, A) { // a = tunic color, A = tunic shade
+  return makeSprite([
+    "................",
+    ".....hhhhhh.....",
+    "....hhhhhhhh....",
+    "....hHssssHh....",
+    "....ssssssss....",
+    "....s0ss0sss....",
+    "....ssssssss....",
+    ".....ssSSs......",
+    "...." + a + a + a + a + a + a + a + a + "....",
+    "..s." + a + A + a + a + a + a + A + a + ".s..",
+    "..ss" + a + a + a + a + a + a + a + a + "ss..",
+    "...." + A + a + a + a + a + a + a + A + "....",
+    "....." + a + a + a + a + a + a + ".....",
+    ".....NN....NN...",
+    ".....NN....NN...",
+    "....000....000..",
+  ]);
+}
+SPRITES.fighter = heroSprite("r", "R");
+SPRITES.wizard  = heroSprite("p", "P");
+SPRITES.rogue   = heroSprite("k", "K");
+SPRITES.cleric  = heroSprite("w", "W");
+
+SPRITES.goblin = makeSprite([
+  "................",
+  "................",
+  "..g..........g..",
+  "..gg.gggggg.gg..",
+  "..ggggggggggg...",
+  "...gggggggggg...",
+  "...g0gggg0gg....",
+  "...gggggggg.....",
+  "....ggrrgg......",
+  "....kkkkkkkk....",
+  "..g.kKkkkkKk.g..",
+  "..ggkkkkkkkkgg..",
+  "....kkkkkkkk....",
+  ".....gg..gg.....",
+  ".....gg..gg.....",
+  "....000..000....",
+]);
+SPRITES.skeleton = makeSprite([
+  "................",
+  "....qqqqqqqq....",
+  "....qqqqqqqq....",
+  "....q0qqqq0q....",
+  "....qqqqqqqq....",
+  ".....q0000q.....",
+  "......qqqq......",
+  "....qqqqqqqq....",
+  "..q..qQQQQq..q..",
+  "..qq.qqqqqq.qq..",
+  ".....qQQQQq.....",
+  "......qqqq......",
+  ".....qQ..Qq.....",
+  ".....qq..qq.....",
+  ".....qq..qq.....",
+  "....000..000....",
+]);
+SPRITES.orc = makeSprite([
+  "................",
+  "...EEEEEEEEEE...",
+  "..EEEEEEEEEEEE..",
+  "..EE0EEEEE0EEE..",
+  "..EEEEEEEEEEEE..",
+  "...EEwEEEEwE....",
+  "...EEEEEEEEE....",
+  "....mmmmmmmm....",
+  "..E.mMmmmmMm.E..",
+  "..EEmmmmmmmmEE..",
+  "..E.mmmmmmmm.E..",
+  "....MmmmmmmM....",
+  ".....EE..EE.....",
+  ".....EE..EE.....",
+  "....NNN..NNN....",
+  "....000..000....",
+]);
+SPRITES.wolf = makeSprite([
+  "................",
+  "................",
+  "................",
+  "..M..........M..",
+  "..MM........MM..",
+  "..MMMMMMMMMMM...",
+  ".MM0MMMMMMMMMM..",
+  ".MMMMMMMMMMMMM..",
+  "..MwwMMMMMMMM...",
+  "...MMMMMMMMMM...",
+  "....MM.MM.MM....",
+  "....MM.MM.MM....",
+  "....00.00.00....",
+  "................",
+  "................",
+  "................",
+]);
+SPRITES.dragon = makeSprite([
+  "....R......R....",
+  "...RR......RR...",
+  "..RRRRRRRRRRRR..",
+  ".RRrrrrrrrrrrRR.",
+  ".Rrr0rrrr0rrrR..",
+  "..rrrrrrrrrrr...",
+  "..rrfFFffFFrr...",
+  "...rrrrrrrrr....",
+  "..RrrrrrrrrrR...",
+  ".RRrrrYYrrrrRR..",
+  ".R.rrrYYrrrr.R..",
+  "...rrrrrrrrr....",
+  "....rrrrrr......",
+  "....rr..rr......",
+  "...RRR..RRR.....",
+  "...000..000.....",
+]);
+SPRITES.chest = makeSprite([
+  "................",
+  "................",
+  "................",
+  "....nnnnnnnn....",
+  "...nNNNNNNNNn...",
+  "...nnnnnnnnnn...",
+  "...nNNNyyNNNn...",
+  "...nnnnyynnnn...",
+  "...nNNNNNNNNn...",
+  "...nnnnnnnnnn...",
+  "...nNNNNNNNNn...",
+  "...nnnnnnnnnn...",
+  "....00000000....",
+  "................",
+  "................",
+  "................",
+]);
+SPRITES.stairs = makeSprite([
+  "0000000000000000",
+  "0kkkkkkkkkkkkkk0",
+  "0kKKKKKKKKKKKk00",
+  "0kK..........000",
+  "0kK.KKKKKKK..000",
+  "0kK.K........000",
+  "0kK.K.KKKK...000",
+  "0kK.K.K......000",
+  "0kK.K.K.KK...000",
+  "0kK.K.K.K....000",
+  "0kK.K.K.K.K..000",
+  "0kK..........000",
+  "0kKKKKKKKKKKK000",
+  "0k00000000000000",
+  "0000000000000000",
+  "0000000000000000",
+]);
+
+// --- Tiles drawn procedurally (deterministic noise) ---
+function hashNoise(x, y, s) {
+  let h = (x * 374761393 + y * 668265263 + s * 1274126177) | 0;
+  h = ((h ^ (h >> 13)) * 1274126177) | 0;
+  return ((h ^ (h >> 16)) >>> 0) / 4294967296;
+}
+function drawTile(type, sx, sy, wx, wy) {
+  switch (type) {
+    case 0: { // grass
+      ctx.fillStyle = "#2f7a38";
+      ctx.fillRect(sx, sy, TILE, TILE);
+      for (let i = 0; i < 6; i++) {
+        const n = hashNoise(wx, wy, i);
+        const n2 = hashNoise(wx, wy, i + 50);
+        ctx.fillStyle = n > 0.5 ? "#3a8f44" : "#276830";
+        ctx.fillRect(sx + ((n * 14) | 0) * 2, sy + ((n2 * 14) | 0) * 2, 4, 4);
+      }
+      break;
+    }
+    case 1: { // tree
+      drawTile(0, sx, sy, wx, wy);
+      ctx.fillStyle = "#5a4020";
+      ctx.fillRect(sx + 12, sy + 20, 8, 10);
+      ctx.fillStyle = "#1c5228";
+      ctx.fillRect(sx + 4, sy + 4, 24, 18);
+      ctx.fillStyle = "#256b34";
+      ctx.fillRect(sx + 8, sy + 2, 16, 8);
+      ctx.fillRect(sx + 6, sy + 8, 8, 8);
+      break;
+    }
+    case 2: { // water
+      ctx.fillStyle = "#1e4a8a";
+      ctx.fillRect(sx, sy, TILE, TILE);
+      const ph = (Date.now() / 600 + wx + wy) | 0;
+      for (let i = 0; i < 4; i++) {
+        const n = hashNoise(wx, wy, i + ph % 3);
+        ctx.fillStyle = "#3a6ab0";
+        ctx.fillRect(sx + ((n * 12) | 0) * 2, sy + ((hashNoise(wx, wy, i + 9) * 14) | 0) * 2, 8, 2);
+      }
+      break;
+    }
+    case 3: { // mountain
+      ctx.fillStyle = "#5a5a66";
+      ctx.fillRect(sx, sy, TILE, TILE);
+      ctx.fillStyle = "#78788a";
+      ctx.beginPath();
+      ctx.moveTo(sx + 4, sy + 28); ctx.lineTo(sx + 16, sy + 4); ctx.lineTo(sx + 28, sy + 28);
+      ctx.fill();
+      ctx.fillStyle = "#e8e8f0";
+      ctx.fillRect(sx + 13, sy + 6, 6, 4);
+      break;
+    }
+    case 4: { // dungeon floor
+      ctx.fillStyle = "#3a3242";
+      ctx.fillRect(sx, sy, TILE, TILE);
+      ctx.fillStyle = "#443a4e";
+      if (hashNoise(wx, wy, 3) > 0.6) ctx.fillRect(sx + 8, sy + 8, 6, 6);
+      ctx.strokeStyle = "#2a2432";
+      ctx.strokeRect(sx + 0.5, sy + 0.5, TILE - 1, TILE - 1);
+      break;
+    }
+    case 5: { // dungeon wall
+      ctx.fillStyle = "#1a1422";
+      ctx.fillRect(sx, sy, TILE, TILE);
+      ctx.fillStyle = "#2e2438";
+      ctx.fillRect(sx + 1, sy + 1, 14, 6); ctx.fillRect(sx + 17, sy + 1, 14, 6);
+      ctx.fillRect(sx + 1, sy + 9, 6, 6); ctx.fillRect(sx + 9, sy + 9, 22, 6);
+      ctx.fillRect(sx + 1, sy + 17, 14, 6); ctx.fillRect(sx + 17, sy + 17, 14, 6);
+      ctx.fillRect(sx + 1, sy + 25, 6, 6); ctx.fillRect(sx + 9, sy + 25, 22, 6);
+      break;
+    }
+    case 6: { // sand/path
+      ctx.fillStyle = "#c8a860";
+      ctx.fillRect(sx, sy, TILE, TILE);
+      for (let i = 0; i < 4; i++) {
+        ctx.fillStyle = "#b89850";
+        ctx.fillRect(sx + ((hashNoise(wx, wy, i) * 14) | 0) * 2, sy + ((hashNoise(wx, wy, i + 20) * 14) | 0) * 2, 4, 2);
+      }
+      break;
+    }
+    case 7: { // dungeon entrance (cave)
+      drawTile(3, sx, sy, wx, wy);
+      ctx.fillStyle = "#000";
+      ctx.fillRect(sx + 10, sy + 14, 12, 14);
+      ctx.fillRect(sx + 12, sy + 10, 8, 6);
+      break;
+    }
+    case 8: { // town
+      drawTile(0, sx, sy, wx, wy);
+      ctx.fillStyle = "#a04030";
+      ctx.beginPath();
+      ctx.moveTo(sx + 2, sy + 14); ctx.lineTo(sx + 16, sy + 2); ctx.lineTo(sx + 30, sy + 14);
+      ctx.fill();
+      ctx.fillStyle = "#c8a870";
+      ctx.fillRect(sx + 6, sy + 14, 20, 14);
+      ctx.fillStyle = "#503820";
+      ctx.fillRect(sx + 13, sy + 18, 6, 10);
+      break;
+    }
+  }
+}
+const SOLID = { 1: true, 2: true, 3: true, 5: true };
+
+// ---------- Classes (D&D style) ----------
+const CLASSES = {
+  fighter: { name: "Fighter", hd: 10, weapon: "Longsword",  wDice: [1, 8],  atkStat: "str", ac: 16, prime: ["str", "con"] },
+  rogue:   { name: "Rogue",   hd: 8,  weapon: "Dagger x2",  wDice: [2, 4],  atkStat: "dex", ac: 14, prime: ["dex", "cha"] },
+  wizard:  { name: "Wizard",  hd: 6,  weapon: "Fire Bolt",  wDice: [1, 10], atkStat: "int", ac: 12, prime: ["int", "wis"] },
+  cleric:  { name: "Cleric",  hd: 8,  weapon: "Mace",       wDice: [1, 6],  atkStat: "wis", ac: 15, prime: ["wis", "con"] },
+};
+
+// ---------- Monsters ----------
+const MONSTERS = {
+  goblin:   { name: "Goblin",        spr: "goblin",   hp: [2, 6, 2],  ac: 13, atk: 4, dmg: [1, 6, 2],  xp: 50,  cr: 1 },
+  wolf:     { name: "Dire Wolf",     spr: "wolf",     hp: [3, 8, 3],  ac: 13, atk: 5, dmg: [1, 8, 3],  xp: 90,  cr: 2 },
+  skeleton: { name: "Skeleton",      spr: "skeleton", hp: [2, 8, 4],  ac: 13, atk: 4, dmg: [1, 6, 2],  xp: 70,  cr: 1 },
+  orc:      { name: "Orc Warrior",   spr: "orc",      hp: [4, 8, 6],  ac: 14, atk: 6, dmg: [1, 12, 3], xp: 150, cr: 3 },
+  dragon:   { name: "Young Dragon",  spr: "dragon",   hp: [8, 10, 16],ac: 17, atk: 8, dmg: [2, 10, 4], xp: 600, cr: 6, boss: true },
+};
+
+// ---------- World generation ----------
+const MAP_W = 48, MAP_H = 48;
+function genOverworld(seed) {
+  const m = [];
+  for (let y = 0; y < MAP_H; y++) {
+    m.push([]);
+    for (let x = 0; x < MAP_W; x++) {
+      const n = hashNoise(x >> 2, y >> 2, seed) * 0.6 + hashNoise(x, y, seed + 1) * 0.4;
+      let t = 0;
+      if (x === 0 || y === 0 || x === MAP_W - 1 || y === MAP_H - 1) t = 3;
+      else if (n < 0.18) t = 2;
+      else if (n < 0.24) t = 6;
+      else if (n > 0.82) t = 3;
+      else if (n > 0.68) t = 1;
+      m[y].push(t);
+    }
+  }
+  return m;
+}
+function genDungeon(seed, level) {
+  const m = [];
+  for (let y = 0; y < MAP_H; y++) {
+    m.push([]);
+    for (let x = 0; x < MAP_W; x++) m[y].push(5);
+  }
+  // drunkard's walk carving
+  let x = MAP_W >> 1, y = MAP_H >> 1, steps = 1400;
+  let rngState = seed * 1000 + level;
+  const rnd = () => { rngState = (rngState * 1103515245 + 12345) & 0x7fffffff; return rngState / 0x7fffffff; };
+  const carved = [];
+  while (steps-- > 0) {
+    m[y][x] = 4;
+    carved.push([x, y]);
+    const d = (rnd() * 4) | 0;
+    if (d === 0 && x > 1) x--;
+    else if (d === 1 && x < MAP_W - 2) x++;
+    else if (d === 2 && y > 1) y--;
+    else if (d === 3 && y < MAP_H - 2) y++;
+  }
+  return { map: m, carved };
+}
+
+// ---------- Game state ----------
+const G = {
+  mode: "title",       // title | create | explore | combat | gameover | victory
+  seed: (Math.random() * 100000) | 0,
+  map: null,
+  area: "overworld",   // overworld | dungeon1 | dungeon2 ...
+  dungeonLevel: 0,
+  px: 0, py: 0,
+  entities: [],        // {x, y, kind:"monster"/"chest"/"stairs"/"entrance"/"town", type}
+  overworldState: null,
+  player: null,
+  combat: null,
+  createStep: 0,
+  createClassIdx: 0,
+  createStats: null,
+  tick: 0,
+};
+
+const CLASS_KEYS = Object.keys(CLASSES);
+
+function newPlayer(classKey, stats) {
+  const c = CLASSES[classKey];
+  const conMod = mod(stats.con);
+  return {
+    cls: classKey,
+    name: c.name,
+    stats,
+    level: 1,
+    hpMax: c.hd + conMod,
+    hp: c.hd + conMod,
+    xp: 0,
+    xpNext: 300,
+    ac: c.ac + (classKey === "rogue" ? mod(stats.dex) : 0),
+    potions: 2,
+    gold: 0,
+    defending: false,
+    spellUses: 3,
+  };
+}
+
+function findOpenSpot(map, rnd) {
+  for (let tries = 0; tries < 500; tries++) {
+    const x = 1 + ((rnd() * (MAP_W - 2)) | 0);
+    const y = 1 + ((rnd() * (MAP_H - 2)) | 0);
+    if (!SOLID[map[y][x]]) return [x, y];
+  }
+  return [MAP_W >> 1, MAP_H >> 1];
+}
+
+function enterOverworld() {
+  if (G.overworldState) {
+    const s = G.overworldState;
+    G.map = s.map; G.entities = s.entities; G.px = s.px; G.py = s.py;
+  } else {
+    G.map = genOverworld(G.seed);
+    let rngState = G.seed;
+    const rnd = () => { rngState = (rngState * 1103515245 + 12345) & 0x7fffffff; return rngState / 0x7fffffff; };
+    G.entities = [];
+    // town start
+    let [tx, ty] = findOpenSpot(G.map, rnd);
+    G.map[ty][tx] = 8;
+    G.px = tx; G.py = ty + 1;
+    if (SOLID[G.map[G.py][G.px]]) G.map[G.py][G.px] = 0;
+    // dungeon entrances
+    for (let i = 0; i < 3; i++) {
+      const [dx, dy] = findOpenSpot(G.map, rnd);
+      G.map[dy][dx] = 7;
+      G.entities.push({ x: dx, y: dy, kind: "entrance", depth: i + 1 });
+    }
+    // roaming monsters
+    const pool = ["goblin", "goblin", "wolf", "skeleton"];
+    for (let i = 0; i < 12; i++) {
+      const [mx, my] = findOpenSpot(G.map, rnd);
+      if (mx === G.px && my === G.py) continue;
+      G.entities.push({ x: mx, y: my, kind: "monster", type: pool[(rnd() * pool.length) | 0] });
+    }
+    // chests
+    for (let i = 0; i < 4; i++) {
+      const [cx2, cy2] = findOpenSpot(G.map, rnd);
+      G.entities.push({ x: cx2, y: cy2, kind: "chest" });
+    }
+  }
+  G.area = "overworld";
+  G.dungeonLevel = 0;
+}
+
+function saveOverworld() {
+  if (G.area === "overworld") {
+    G.overworldState = { map: G.map, entities: G.entities, px: G.px, py: G.py };
+  }
+}
+
+function enterDungeon(depth) {
+  saveOverworld();
+  const { map, carved } = genDungeon(G.seed, depth);
+  G.map = map;
+  G.area = "dungeon" + depth;
+  G.dungeonLevel = depth;
+  G.entities = [];
+  let rngState = G.seed + depth * 777;
+  const rnd = () => { rngState = (rngState * 1103515245 + 12345) & 0x7fffffff; return rngState / 0x7fffffff; };
+  const start = carved[0];
+  G.px = start[0]; G.py = start[1];
+  // exit stairs at far end
+  const end = carved[carved.length - 1];
+  G.entities.push({ x: end[0], y: end[1], kind: "stairs" });
+  // monsters scale with depth
+  const pools = [["goblin", "skeleton", "wolf"], ["skeleton", "orc", "wolf"], ["orc", "orc", "skeleton"]];
+  const pool = pools[Math.min(depth - 1, 2)];
+  const count = 6 + depth * 2;
+  for (let i = 0; i < count; i++) {
+    const [x, y] = carved[(rnd() * carved.length) | 0];
+    if ((x === G.px && y === G.py) || (x === end[0] && y === end[1])) continue;
+    G.entities.push({ x, y, kind: "monster", type: pool[(rnd() * pool.length) | 0] });
+  }
+  // boss dragon in deepest dungeon guarding the stairs vicinity
+  if (depth === 3) {
+    const [bx, by] = carved[carved.length - 2];
+    G.entities.push({ x: bx, y: by, kind: "monster", type: "dragon" });
+  }
+  for (let i = 0; i < 2 + depth; i++) {
+    const [x, y] = carved[(rnd() * carved.length) | 0];
+    if (x === G.px && y === G.py) continue;
+    G.entities.push({ x, y, kind: "chest" });
+  }
+  log(`You descend into Dungeon Level ${depth}...`, "sys");
+}
+
+// ---------- Combat ----------
+function startCombat(monsterType, entRef) {
+  const M = MONSTERS[monsterType];
+  G.combat = {
+    type: monsterType,
+    name: M.name,
+    hp: rollDice(M.hp[0], M.hp[1], M.hp[2]),
+    hpMax: 0,
+    ac: M.ac,
+    atk: M.atk,
+    dmg: M.dmg,
+    xp: M.xp,
+    boss: !!M.boss,
+    entRef,
+    turn: "player",
+    flash: 0,
+    playerFlash: 0,
+  };
+  G.combat.hpMax = G.combat.hp;
+  G.mode = "combat";
+  // Initiative
+  const pInit = roll(20) + mod(G.player.stats.dex);
+  const mInit = roll(20) + 1;
+  log(`— ${M.name} attacks! —`, "sys");
+  log(`Initiative: you ${pInit}, foe ${mInit}.`, "roll");
+  G.combat.turn = pInit >= mInit ? "player" : "monster";
+  if (G.combat.turn === "monster") setTimeout(monsterTurn, 700);
+}
+
+function playerAttack(kind) {
+  const cb = G.combat, p = G.player, c = CLASSES[p.cls];
+  if (!cb || cb.turn !== "player") return;
+  p.defending = false;
+
+  if (kind === "defend") {
+    p.defending = true;
+    log("You raise your guard. (+4 AC until next turn)", "good");
+    endPlayerTurn();
+    return;
+  }
+  if (kind === "potion") {
+    if (p.potions <= 0) { log("No potions left!", "dmg"); return; }
+    p.potions--;
+    const heal = rollDice(2, 4, 2);
+    p.hp = Math.min(p.hpMax, p.hp + heal);
+    log(`You drink a potion and heal ${heal} HP.`, "good");
+    updateHUD();
+    endPlayerTurn();
+    return;
+  }
+  if (kind === "flee") {
+    const r = roll(20) + mod(p.stats.dex);
+    log(`Flee attempt: d20${fmtMod(mod(p.stats.dex))} = ${r} (DC 10)`, "roll");
+    if (cb.boss) { log("You cannot flee from the dragon!", "dmg"); endPlayerTurn(); return; }
+    if (r >= 10) {
+      log("You escape!", "good");
+      G.combat = null;
+      G.mode = "explore";
+      return;
+    }
+    log("You fail to escape!", "dmg");
+    endPlayerTurn();
+    return;
+  }
+
+  // attack / spell
+  let atkMod, nD, dS, dB, label;
+  if (kind === "spell") {
+    if (p.cls !== "wizard" && p.cls !== "cleric") { log("You don't know any spells!", "dmg"); return; }
+    if (p.spellUses <= 0) { log("Out of spell slots!", "dmg"); return; }
+    p.spellUses--;
+    if (p.cls === "wizard") { atkMod = mod(p.stats.int) + 2; nD = 2; dS = 8; dB = mod(p.stats.int); label = "Magic Missile barrage"; }
+    else { atkMod = mod(p.stats.wis) + 2; nD = 2; dS = 6; dB = mod(p.stats.wis); label = "Sacred Flame"; }
+  } else {
+    const st = p.stats[c.atkStat];
+    atkMod = mod(st) + 2; // proficiency
+    nD = c.wDice[0]; dS = c.wDice[1]; dB = mod(st);
+    label = c.weapon;
+  }
+
+  const d20 = roll(20);
+  const total = d20 + atkMod;
+  const crit = d20 === 20;
+  log(`${label}: d20(${d20})${fmtMod(atkMod)} = ${total} vs AC ${cb.ac}`, "roll");
+  if (d20 === 1) {
+    log("Critical miss! You fumble.", "dmg");
+  } else if (crit || total >= cb.ac) {
+    let dmg = rollDice(crit ? nD * 2 : nD, dS, dB);
+    if (p.cls === "rogue" && (crit || roll(20) > 12)) {
+      const sneak = rollDice(1, 6);
+      dmg += sneak;
+      log(`Sneak attack! +${sneak} damage.`, "crit");
+    }
+    dmg = Math.max(1, dmg);
+    cb.hp -= dmg;
+    cb.flash = 8;
+    log(crit ? `CRITICAL HIT! ${dmg} damage!` : `Hit! ${dmg} damage.`, crit ? "crit" : "good");
+    if (cb.hp <= 0) { winCombat(); return; }
+  } else {
+    log("Miss!", "dmg");
+  }
+  endPlayerTurn();
+}
+
+function endPlayerTurn() {
+  if (!G.combat) return;
+  G.combat.turn = "monster";
+  setTimeout(monsterTurn, 700);
+}
+
+function monsterTurn() {
+  const cb = G.combat, p = G.player;
+  if (!cb) return;
+  const effAC = p.ac + (p.defending ? 4 : 0);
+  const d20 = roll(20);
+  const total = d20 + cb.atk;
+  log(`${cb.name} attacks: d20(${d20})+${cb.atk} = ${total} vs AC ${effAC}`, "roll");
+  if (d20 !== 1 && (d20 === 20 || total >= effAC)) {
+    let dmg = rollDice(d20 === 20 ? cb.dmg[0] * 2 : cb.dmg[0], cb.dmg[1], cb.dmg[2]);
+    dmg = Math.max(1, dmg);
+    p.hp -= dmg;
+    cb.playerFlash = 8;
+    log(d20 === 20 ? `CRITICAL! You take ${dmg} damage!` : `You take ${dmg} damage.`, "dmg");
+    updateHUD();
+    if (p.hp <= 0) {
+      p.hp = 0;
+      updateHUD();
+      G.mode = "gameover";
+      G.combat = null;
+      log("You have fallen... Press Enter to try again.", "dmg");
+      return;
+    }
+  } else {
+    log(`${cb.name} misses!`, "good");
+  }
+  p.defending = false;
+  cb.turn = "player";
+}
+
+function winCombat() {
+  const cb = G.combat, p = G.player;
+  log(`${cb.name} is slain! +${cb.xp} XP`, "crit");
+  p.xp += cb.xp;
+  const gold = rollDice(2, 6, cb.boss ? 50 : 0);
+  p.gold += gold;
+  log(`You loot ${gold} gold.`, "good");
+  // remove entity from map
+  const i = G.entities.indexOf(cb.entRef);
+  if (i >= 0) G.entities.splice(i, 1);
+  const wasBoss = cb.boss;
+  G.combat = null;
+  G.mode = "explore";
+  while (p.xp >= p.xpNext) levelUp();
+  updateHUD();
+  if (wasBoss) {
+    G.mode = "victory";
+    log("The dragon falls! The realm is saved! Press Enter to play again.", "crit");
+  }
+}
+
+function levelUp() {
+  const p = G.player, c = CLASSES[p.cls];
+  p.level++;
+  p.xp -= p.xpNext;
+  p.xpNext = Math.floor(p.xpNext * 1.7);
+  const gain = Math.max(1, rollDice(1, c.hd, mod(p.stats.con)));
+  p.hpMax += gain;
+  p.hp = p.hpMax;
+  p.spellUses = 3 + Math.floor(p.level / 2);
+  log(`⬆ Level ${p.level}! Max HP +${gain}, fully healed.`, "crit");
+}
+
+// ---------- Exploration ----------
+function tryMove(dx, dy) {
+  const nx = G.px + dx, ny = G.py + dy;
+  if (nx < 0 || ny < 0 || nx >= MAP_W || ny >= MAP_H) return;
+  const t = G.map[ny][nx];
+
+  // check entities at target
+  const ent = G.entities.find(e => e.x === nx && e.y === ny);
+  if (ent) {
+    if (ent.kind === "monster") { startCombat(ent.type, ent); return; }
+    if (ent.kind === "chest") {
+      openChest(ent);
+      return;
+    }
+    if (ent.kind === "stairs") {
+      // climb out of dungeon
+      log("You climb the stairs back to the surface.", "sys");
+      enterOverworld();
+      updateHUD();
+      return;
+    }
+  }
+  if (SOLID[t]) return;
+
+  G.px = nx; G.py = ny;
+
+  if (t === 7) { // dungeon entrance
+    const e = G.entities.find(e2 => e2.kind === "entrance" && e2.x === nx && e2.y === ny);
+    enterDungeon(e ? e.depth : 1);
+    updateHUD();
+    return;
+  }
+  if (t === 8) { // town: rest
+    const p = G.player;
+    if (p.hp < p.hpMax || p.potions < 2) {
+      p.hp = p.hpMax;
+      p.spellUses = 3 + Math.floor(p.level / 2);
+      if (p.gold >= 25 && p.potions < 5) { p.gold -= 25; p.potions++; log("Bought a potion for 25 gold.", "good"); }
+      log("You rest at the inn. HP and spells restored.", "good");
+      updateHUD();
+    }
+    return;
+  }
+  // random encounter in dungeons
+  if (G.dungeonLevel > 0 && Math.random() < 0.03) {
+    const pool = ["goblin", "skeleton", "wolf", "orc"];
+    const type = pool[Math.min(pool.length - 1, (Math.random() * (2 + G.dungeonLevel)) | 0)];
+    const wanderer = { x: nx, y: ny, kind: "monster", type };
+    G.entities.push(wanderer);
+    log("A monster ambushes you from the shadows!", "dmg");
+    startCombat(type, wanderer);
+  }
+}
+
+function openChest(ent) {
+  const p = G.player;
+  const r = roll(6);
+  if (r <= 3) {
+    const g = rollDice(3, 10, 10);
+    p.gold += g;
+    log(`Chest opened: ${g} gold!`, "good");
+  } else if (r <= 5) {
+    p.potions++;
+    log("Chest opened: a healing potion!", "good");
+  } else {
+    p.hpMax += 2; p.hp += 2;
+    log("Chest opened: an enchanted trinket! Max HP +2.", "crit");
+  }
+  const i = G.entities.indexOf(ent);
+  if (i >= 0) G.entities.splice(i, 1);
+  updateHUD();
+}
+
+// ---------- HUD ----------
+function updateHUD() {
+  const p = G.player;
+  if (!p) return;
+  document.getElementById("pname").textContent = `${p.name} — Lv ${p.level}`;
+  document.getElementById("hptext").textContent = `${p.hp}/${p.hpMax}`;
+  document.querySelector("#hpbar > div").style.width = (100 * p.hp / p.hpMax) + "%";
+  document.getElementById("xptext").textContent = `${p.xp}/${p.xpNext}`;
+  document.querySelector("#xpbar > div").style.width = (100 * p.xp / p.xpNext) + "%";
+  const s = p.stats;
+  document.getElementById("statline").innerHTML =
+    `STR ${s.str} (${fmtMod(mod(s.str))}) &nbsp;DEX ${s.dex} (${fmtMod(mod(s.dex))}) &nbsp;CON ${s.con} (${fmtMod(mod(s.con))})<br>` +
+    `INT ${s.int} (${fmtMod(mod(s.int))}) &nbsp;WIS ${s.wis} (${fmtMod(mod(s.wis))}) &nbsp;CHA ${s.cha} (${fmtMod(mod(s.cha))})<br>` +
+    `AC ${p.ac} &nbsp;&middot;&nbsp; ${CLASSES[p.cls].weapon}`;
+  document.getElementById("invline").innerHTML =
+    `&#129380; Potions: ${p.potions} &nbsp;&#128176; Gold: ${p.gold}` +
+    ((p.cls === "wizard" || p.cls === "cleric") ? ` &nbsp;&#10024; Spells: ${p.spellUses}` : "");
+}
+
+// ---------- Rendering ----------
+function drawText(txt, x, y, size, color, align) {
+  ctx.fillStyle = color || "#e8d8b0";
+  ctx.font = `bold ${size}px 'Courier New', monospace`;
+  ctx.textAlign = align || "left";
+  ctx.fillText(txt, x, y);
+  ctx.textAlign = "left";
+}
+
+function render() {
+  G.tick++;
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, 0, cv.width, cv.height);
+
+  if (G.mode === "title") { renderTitle(); return; }
+  if (G.mode === "create") { renderCreate(); return; }
+  if (G.mode === "combat") { renderCombat(); return; }
+
+  // explore / gameover / victory: draw world
+  const half = VIEW >> 1;
+  let camX = Math.max(0, Math.min(MAP_W - VIEW, G.px - half));
+  let camY = Math.max(0, Math.min(MAP_H - VIEW, G.py - half));
+  for (let vy = 0; vy < VIEW; vy++) {
+    for (let vx = 0; vx < VIEW; vx++) {
+      const wx = camX + vx, wy = camY + vy;
+      drawTile(G.map[wy][wx], vx * TILE, vy * TILE, wx, wy);
+    }
+  }
+  for (const e of G.entities) {
+    const vx = e.x - camX, vy = e.y - camY;
+    if (vx < 0 || vy < 0 || vx >= VIEW || vy >= VIEW) continue;
+    let spr = null;
+    if (e.kind === "monster") spr = SPRITES[MONSTERS[e.type].spr];
+    else if (e.kind === "chest") spr = SPRITES.chest;
+    else if (e.kind === "stairs") spr = SPRITES.stairs;
+    if (spr) ctx.drawImage(spr, vx * TILE, vy * TILE);
+  }
+  // player with idle bob
+  const bob = (G.tick >> 4) % 2;
+  ctx.drawImage(SPRITES[G.player.cls], (G.px - camX) * TILE, (G.py - camY) * TILE - bob);
+
+  // area label
+  ctx.fillStyle = "rgba(0,0,0,0.6)";
+  ctx.fillRect(4, 4, 180, 22);
+  drawText(G.dungeonLevel > 0 ? `Dungeon — Level ${G.dungeonLevel}` : "Overworld", 10, 20, 13, "#f0c060");
+
+  if (G.mode === "gameover") overlay("YOU DIED", "#e05050", "Press Enter to rise again");
+  if (G.mode === "victory") overlay("VICTORY!", "#ffd700", "The dragon is slain! Enter to replay");
+}
+
+function overlay(title, color, sub) {
+  ctx.fillStyle = "rgba(0,0,0,0.75)";
+  ctx.fillRect(0, 0, cv.width, cv.height);
+  drawText(title, cv.width / 2, 220, 42, color, "center");
+  drawText(sub, cv.width / 2, 260, 15, "#e8d8b0", "center");
+}
+
+function renderTitle() {
+  ctx.fillStyle = "#100a18";
+  ctx.fillRect(0, 0, cv.width, cv.height);
+  // starfield
+  for (let i = 0; i < 40; i++) {
+    const n1 = hashNoise(i, 7, 3), n2 = hashNoise(i, 13, 5);
+    ctx.fillStyle = (i + (G.tick >> 5)) % 5 ? "#544a6a" : "#a89ac8";
+    ctx.fillRect((n1 * 476) | 0, (n2 * 300) | 0, 3, 3);
+  }
+  ctx.drawImage(SPRITES.dragon, 160, 60, 160, 160);
+  drawText("PIXELFUNZ", cv.width / 2, 280, 44, "#f0c060", "center");
+  drawText("A D&D-Style Pixel Adventure", cv.width / 2, 312, 16, "#b09fd0", "center");
+  if ((G.tick >> 4) % 2) drawText("— Press Enter to begin —", cv.width / 2, 380, 18, "#e8d8b0", "center");
+  drawText("Slay the dragon in Dungeon 3 to win!", cv.width / 2, 430, 13, "#a08868", "center");
+}
+
+function renderCreate() {
+  ctx.fillStyle = "#100a18";
+  ctx.fillRect(0, 0, cv.width, cv.height);
+  drawText("CREATE YOUR HERO", cv.width / 2, 50, 24, "#f0c060", "center");
+
+  if (G.createStep === 0) {
+    drawText("Choose a class (←/→, Enter):", cv.width / 2, 90, 15, "#e8d8b0", "center");
+    CLASS_KEYS.forEach((k, i) => {
+      const x = 40 + i * 105;
+      const sel = i === G.createClassIdx;
+      if (sel) {
+        ctx.strokeStyle = "#f0c060";
+        ctx.lineWidth = 3;
+        ctx.strokeRect(x - 8, 110, 96, 130);
+      }
+      ctx.drawImage(SPRITES[k], x + 8, 120, 64, 64);
+      drawText(CLASSES[k].name, x + 40, 205, 14, sel ? "#f0c060" : "#a08868", "center");
+      drawText("d" + CLASSES[k].hd + " HD", x + 40, 224, 11, "#8fd0ff", "center");
+    });
+    const c = CLASSES[CLASS_KEYS[G.createClassIdx]];
+    drawText(`Weapon: ${c.weapon}  ·  AC ${c.ac}`, cv.width / 2, 280, 14, "#9fe89f", "center");
+    drawText(`Primary: ${c.prime.map(s => s.toUpperCase()).join(" & ")}`, cv.width / 2, 305, 14, "#9fe89f", "center");
+  } else {
+    const s = G.createStats;
+    drawText("Ability Scores (4d6 drop lowest)", cv.width / 2, 95, 15, "#e8d8b0", "center");
+    const names = ["str", "dex", "con", "int", "wis", "cha"];
+    names.forEach((n, i) => {
+      const y = 140 + i * 34;
+      drawText(n.toUpperCase(), 150, y, 18, "#f0c060");
+      drawText(String(s[n]).padStart(2), 240, y, 18, "#e8d8b0");
+      drawText("(" + fmtMod(mod(s[n])) + ")", 290, y, 15, "#8fd0ff");
+    });
+    drawText("R: reroll   ·   Enter: begin adventure", cv.width / 2, 390, 15, "#9fe89f", "center");
+  }
+}
+
+function renderCombat() {
+  const cb = G.combat, p = G.player;
+  // backdrop
+  const dun = G.dungeonLevel > 0;
+  const grd = ctx.createLinearGradient(0, 0, 0, cv.height);
+  grd.addColorStop(0, dun ? "#181020" : "#284a70");
+  grd.addColorStop(1, dun ? "#2a1c30" : "#2f7a38");
+  ctx.fillStyle = grd;
+  ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.fillStyle = dun ? "#241a2e" : "#256b34";
+  ctx.fillRect(0, 330, cv.width, 150);
+
+  // monster
+  const mFlash = cb.flash > 0;
+  if (cb.flash > 0) cb.flash--;
+  const mBob = Math.sin(G.tick / 12) * 4;
+  if (!mFlash || G.tick % 4 < 2) {
+    ctx.drawImage(SPRITES[MONSTERS[cb.type].spr], 280, 130 + mBob, cb.boss ? 160 : 128, cb.boss ? 160 : 128);
+  }
+  // player (back view = just sprite, flipped position)
+  const pFlash = cb.playerFlash > 0;
+  if (cb.playerFlash > 0) cb.playerFlash--;
+  if (!pFlash || G.tick % 4 < 2) {
+    ctx.drawImage(SPRITES[p.cls], 70, 250, 96, 96);
+  }
+
+  // monster HP plate
+  ctx.fillStyle = "rgba(0,0,0,0.65)";
+  ctx.fillRect(260, 60, 200, 50);
+  drawText(cb.name, 270, 80, 15, cb.boss ? "#ffd700" : "#e8d8b0");
+  ctx.fillStyle = "#402030"; ctx.fillRect(270, 90, 180, 10);
+  ctx.fillStyle = "#e05050"; ctx.fillRect(270, 90, 180 * Math.max(0, cb.hp) / cb.hpMax, 10);
+
+  // action menu
+  ctx.fillStyle = "rgba(0,0,0,0.7)";
+  ctx.fillRect(10, 360, 460, 110);
+  ctx.strokeStyle = "#6b4a2a"; ctx.lineWidth = 2;
+  ctx.strokeRect(10, 360, 460, 110);
+  if (cb.turn === "player") {
+    const canSpell = p.cls === "wizard" || p.cls === "cleric";
+    drawText("Your turn:", 24, 384, 14, "#f0c060");
+    drawText(`1) Attack (${CLASSES[p.cls].weapon})`, 24, 408, 14);
+    drawText(canSpell ? `2) Cast Spell [${p.spellUses}]` : "2) —", 24, 430, 14, canSpell ? "#e8d8b0" : "#555");
+    drawText("3) Defend", 24, 452, 14);
+    drawText(`4) Flee    H) Potion [${p.potions}]`, 250, 452, 14);
+  } else {
+    drawText(`${cb.name} is acting...`, 24, 408, 15, "#ff8f8f");
+  }
+}
+
+// ---------- Input ----------
+function startCreation() {
+  G.mode = "create";
+  G.createStep = 0;
+  G.createClassIdx = 0;
+}
+function rollStats() {
+  return {
+    str: roll4d6DropLowest(), dex: roll4d6DropLowest(), con: roll4d6DropLowest(),
+    int: roll4d6DropLowest(), wis: roll4d6DropLowest(), cha: roll4d6DropLowest(),
+  };
+}
+function beginAdventure() {
+  G.player = newPlayer(CLASS_KEYS[G.createClassIdx], G.createStats);
+  G.seed = (Math.random() * 100000) | 0;
+  G.overworldState = null;
+  enterOverworld();
+  G.mode = "explore";
+  logEl.innerHTML = "";
+  log(`Welcome, ${G.player.name}! Find the cave entrances and slay the dragon in Dungeon 3.`, "sys");
+  log("Return to the town house to rest and buy potions.", "sys");
+  updateHUD();
+}
+
+document.addEventListener("keydown", (ev) => {
+  const k = ev.key;
+  if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(k)) ev.preventDefault();
+
+  if (G.mode === "title") {
+    if (k === "Enter") startCreation();
+    return;
+  }
+  if (G.mode === "create") {
+    if (G.createStep === 0) {
+      if (k === "ArrowLeft" || k === "a") G.createClassIdx = (G.createClassIdx + 3) % 4;
+      if (k === "ArrowRight" || k === "d") G.createClassIdx = (G.createClassIdx + 1) % 4;
+      if (k === "Enter") { G.createStats = rollStats(); G.createStep = 1; }
+    } else {
+      if (k === "r" || k === "R") G.createStats = rollStats();
+      if (k === "Enter") beginAdventure();
+    }
+    return;
+  }
+  if (G.mode === "gameover" || G.mode === "victory") {
+    if (k === "Enter") { G.mode = "title"; }
+    return;
+  }
+  if (G.mode === "combat") {
+    if (k === "1") playerAttack("attack");
+    if (k === "2") playerAttack("spell");
+    if (k === "3") playerAttack("defend");
+    if (k === "4") playerAttack("flee");
+    if (k === "h" || k === "H") playerAttack("potion");
+    return;
+  }
+  if (G.mode === "explore") {
+    if (k === "ArrowUp" || k === "w") tryMove(0, -1);
+    else if (k === "ArrowDown" || k === "s") tryMove(0, 1);
+    else if (k === "ArrowLeft" || k === "a") tryMove(-1, 0);
+    else if (k === "ArrowRight" || k === "d") tryMove(1, 0);
+    else if (k === "h" || k === "H") {
+      const p = G.player;
+      if (p.potions > 0 && p.hp < p.hpMax) {
+        p.potions--;
+        const heal = rollDice(2, 4, 2);
+        p.hp = Math.min(p.hpMax, p.hp + heal);
+        log(`You drink a potion and heal ${heal} HP.`, "good");
+        updateHUD();
+      }
+    }
+  }
+});
+
+cv.focus();
+cv.addEventListener("click", () => cv.focus());
+
+(function loop() {
+  render();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
