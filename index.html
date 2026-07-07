@@ -229,13 +229,13 @@ function heroSprite(a, A) { // a = tunic color, A = tunic shade
     "....hHssssHh....",
     "....ssssssss....",
     "....s0ss0sss....",
-    "....ssssssss....",
+    "....sssssSss....",
     ".....ssSSs......",
     "...." + a + a + a + a + a + a + a + a + "....",
     "..s." + a + A + a + a + a + a + A + a + ".s..",
     "..ss" + a + a + a + a + a + a + a + a + "ss..",
     "...." + A + a + a + a + a + a + a + A + "....",
-    "....." + a + a + a + a + a + a + ".....",
+    ".....NNyyNN.....",
     ".....NN....NN...",
     ".....NN....NN...",
     "....000....000..",
@@ -255,7 +255,7 @@ SPRITES.goblin = makeSprite([
   "...gggggggggg...",
   "...g0gggg0gg....",
   "...gggggggg.....",
-  "....ggrrgg......",
+  "....ggrwgg......",
   "....kkkkkkkk....",
   "..g.kKkkkkKk.g..",
   "..ggkkkkkkkkgg..",
@@ -392,39 +392,105 @@ function drawTile(type, sx, sy, wx, wy) {
         ctx.fillStyle = n > 0.5 ? "#3a8f44" : "#276830";
         ctx.fillRect(sx + ((n * 14) | 0) * 2, sy + ((n2 * 14) | 0) * 2, 4, 4);
       }
+      // grass blade tufts
+      for (let i = 0; i < 3; i++) {
+        const bx = sx + ((hashNoise(wx, wy, i + 60) * 14) | 0) * 2;
+        const by = sy + ((hashNoise(wx, wy, i + 70) * 12) | 0) * 2;
+        ctx.fillStyle = "#4aa050";
+        ctx.fillRect(bx, by, 2, 6);
+        ctx.fillRect(bx + 4, by + 2, 2, 4);
+      }
+      // occasional wildflower
+      const fn = hashNoise(wx, wy, 80);
+      if (fn > 0.88) {
+        const fx = sx + ((hashNoise(wx, wy, 81) * 12) | 0) * 2 + 2;
+        const fy = sy + ((hashNoise(wx, wy, 82) * 12) | 0) * 2 + 2;
+        ctx.fillStyle = fn > 0.94 ? "#e8d050" : "#e8e8f0";
+        ctx.fillRect(fx, fy, 4, 4);
+        ctx.fillStyle = "#c07828";
+        ctx.fillRect(fx + 1, fy + 1, 2, 2);
+      }
       break;
     }
     case T_TREE: { // tree
       drawTile(T_GRASS, sx, sy, wx, wy);
+      // ground shadow under the canopy
+      ctx.fillStyle = "rgba(0,0,0,0.18)";
+      ctx.fillRect(sx + 6, sy + 26, 20, 4);
+      // trunk with bark shading
       ctx.fillStyle = "#5a4020";
       ctx.fillRect(sx + 12, sy + 20, 8, 10);
+      ctx.fillStyle = "#3e2a12";
+      ctx.fillRect(sx + 17, sy + 20, 3, 10);
+      ctx.fillStyle = "#6e5228";
+      ctx.fillRect(sx + 12, sy + 20, 2, 10);
+      // layered canopy: dark base, mid tone, sunlit top
       ctx.fillStyle = "#1c5228";
       ctx.fillRect(sx + 4, sy + 4, 24, 18);
       ctx.fillStyle = "#256b34";
       ctx.fillRect(sx + 8, sy + 2, 16, 8);
       ctx.fillRect(sx + 6, sy + 8, 8, 8);
+      ctx.fillStyle = "#2f8040";
+      ctx.fillRect(sx + 10, sy + 4, 8, 4);
+      ctx.fillRect(sx + 8, sy + 10, 4, 4);
+      // deterministic leaf speckles
+      for (let i = 0; i < 4; i++) {
+        ctx.fillStyle = hashNoise(wx, wy, i + 90) > 0.5 ? "#38914a" : "#154020";
+        ctx.fillRect(sx + 6 + ((hashNoise(wx, wy, i + 95) * 10) | 0) * 2,
+                     sy + 5 + ((hashNoise(wx, wy, i + 100) * 7) | 0) * 2, 2, 2);
+      }
       break;
     }
     case T_WATER: { // water
+      // deep-to-shallow banding for a sense of depth
       ctx.fillStyle = "#1e4a8a";
       ctx.fillRect(sx, sy, TILE, TILE);
+      ctx.fillStyle = "#183e78";
+      for (let i = 0; i < 3; i++) {
+        ctx.fillRect(sx + ((hashNoise(wx, wy, i + 30) * 12) | 0) * 2,
+                     sy + ((hashNoise(wx, wy, i + 40) * 12) | 0) * 2, 10, 4);
+      }
       const ph = (Date.now() / 600 + wx + wy) | 0;
       for (let i = 0; i < 4; i++) {
         const n = hashNoise(wx, wy, i + ph % 3);
         ctx.fillStyle = "#3a6ab0";
         ctx.fillRect(sx + ((n * 12) | 0) * 2, sy + ((hashNoise(wx, wy, i + 9) * 14) | 0) * 2, 8, 2);
       }
+      // animated glints riding the wave crests
+      for (let i = 0; i < 2; i++) {
+        const n = hashNoise(wx, wy, i + 5 + ph % 3);
+        ctx.fillStyle = "#7ea8d8";
+        ctx.fillRect(sx + ((n * 13) | 0) * 2, sy + ((hashNoise(wx, wy, i + 15) * 14) | 0) * 2, 4, 2);
+      }
       break;
     }
     case T_MOUNTAIN: { // mountain
       ctx.fillStyle = "#5a5a66";
       ctx.fillRect(sx, sy, TILE, TILE);
+      // scattered rocky rubble at the base
+      for (let i = 0; i < 4; i++) {
+        ctx.fillStyle = hashNoise(wx, wy, i + 110) > 0.5 ? "#6a6a78" : "#4c4c58";
+        ctx.fillRect(sx + ((hashNoise(wx, wy, i + 115) * 14) | 0) * 2,
+                     sy + ((hashNoise(wx, wy, i + 120) * 14) | 0) * 2, 4, 2);
+      }
+      // shaded east face gives the peak volume
+      ctx.fillStyle = "#63636f";
+      ctx.beginPath();
+      ctx.moveTo(sx + 16, sy + 4); ctx.lineTo(sx + 28, sy + 28); ctx.lineTo(sx + 16, sy + 28);
+      ctx.fill();
       ctx.fillStyle = "#78788a";
       ctx.beginPath();
-      ctx.moveTo(sx + 4, sy + 28); ctx.lineTo(sx + 16, sy + 4); ctx.lineTo(sx + 28, sy + 28);
+      ctx.moveTo(sx + 4, sy + 28); ctx.lineTo(sx + 16, sy + 4); ctx.lineTo(sx + 16, sy + 28);
       ctx.fill();
+      // crevice line down the shaded face
+      ctx.fillStyle = "#50505c";
+      ctx.fillRect(sx + 18, sy + 12, 2, 8);
+      ctx.fillRect(sx + 20, sy + 20, 2, 6);
+      // snow cap with drips
       ctx.fillStyle = "#e8e8f0";
       ctx.fillRect(sx + 13, sy + 6, 6, 4);
+      ctx.fillRect(sx + 12, sy + 10, 2, 2);
+      ctx.fillRect(sx + 18, sy + 10, 2, 2);
       break;
     }
     case T_FLOOR: { // dungeon floor
@@ -432,6 +498,20 @@ function drawTile(type, sx, sy, wx, wy) {
       ctx.fillRect(sx, sy, TILE, TILE);
       ctx.fillStyle = "#443a4e";
       if (hashNoise(wx, wy, 3) > 0.6) ctx.fillRect(sx + 8, sy + 8, 6, 6);
+      // cracks and pebbles worn into the flagstones
+      const cn = hashNoise(wx, wy, 130);
+      if (cn > 0.7) {
+        ctx.fillStyle = "#2a2432";
+        const cx2 = sx + ((hashNoise(wx, wy, 131) * 10) | 0) * 2 + 4;
+        const cy2 = sy + ((hashNoise(wx, wy, 132) * 10) | 0) * 2 + 4;
+        ctx.fillRect(cx2, cy2, 6, 2);
+        ctx.fillRect(cx2 + 4, cy2 + 2, 2, 4);
+      }
+      if (hashNoise(wx, wy, 135) > 0.75) {
+        ctx.fillStyle = "#4e4458";
+        ctx.fillRect(sx + ((hashNoise(wx, wy, 136) * 13) | 0) * 2,
+                     sy + ((hashNoise(wx, wy, 137) * 13) | 0) * 2, 2, 2);
+      }
       ctx.strokeStyle = "#2a2432";
       ctx.strokeRect(sx + 0.5, sy + 0.5, TILE - 1, TILE - 1);
       break;
@@ -444,6 +524,23 @@ function drawTile(type, sx, sy, wx, wy) {
       ctx.fillRect(sx + 1, sy + 9, 6, 6); ctx.fillRect(sx + 9, sy + 9, 22, 6);
       ctx.fillRect(sx + 1, sy + 17, 14, 6); ctx.fillRect(sx + 17, sy + 17, 14, 6);
       ctx.fillRect(sx + 1, sy + 25, 6, 6); ctx.fillRect(sx + 9, sy + 25, 22, 6);
+      // top-edge highlight on each brick to catch torchlight
+      ctx.fillStyle = "#3a2e48";
+      ctx.fillRect(sx + 1, sy + 1, 14, 2); ctx.fillRect(sx + 17, sy + 1, 14, 2);
+      ctx.fillRect(sx + 1, sy + 9, 6, 2); ctx.fillRect(sx + 9, sy + 9, 22, 2);
+      ctx.fillRect(sx + 1, sy + 17, 14, 2); ctx.fillRect(sx + 17, sy + 17, 14, 2);
+      ctx.fillRect(sx + 1, sy + 25, 6, 2); ctx.fillRect(sx + 9, sy + 25, 22, 2);
+      // deterministic chips and moss on some bricks
+      if (hashNoise(wx, wy, 140) > 0.65) {
+        ctx.fillStyle = "#241c2c";
+        ctx.fillRect(sx + ((hashNoise(wx, wy, 141) * 12) | 0) * 2 + 2,
+                     sy + ((hashNoise(wx, wy, 142) * 3) | 0) * 8 + 3, 4, 2);
+      }
+      if (hashNoise(wx, wy, 145) > 0.85) {
+        ctx.fillStyle = "#2c4030";
+        ctx.fillRect(sx + ((hashNoise(wx, wy, 146) * 12) | 0) * 2 + 2,
+                     sy + ((hashNoise(wx, wy, 147) * 3) | 0) * 8 + 4, 4, 2);
+      }
       break;
     }
     case T_SAND: { // sand/path
@@ -453,25 +550,66 @@ function drawTile(type, sx, sy, wx, wy) {
         ctx.fillStyle = "#b89850";
         ctx.fillRect(sx + ((hashNoise(wx, wy, i) * 14) | 0) * 2, sy + ((hashNoise(wx, wy, i + 20) * 14) | 0) * 2, 4, 2);
       }
+      // lighter wind-blown grains and the odd pebble
+      for (let i = 0; i < 3; i++) {
+        ctx.fillStyle = "#d8bc78";
+        ctx.fillRect(sx + ((hashNoise(wx, wy, i + 150) * 14) | 0) * 2,
+                     sy + ((hashNoise(wx, wy, i + 155) * 14) | 0) * 2, 2, 2);
+      }
+      if (hashNoise(wx, wy, 160) > 0.8) {
+        ctx.fillStyle = "#907840";
+        ctx.fillRect(sx + ((hashNoise(wx, wy, 161) * 12) | 0) * 2 + 2,
+                     sy + ((hashNoise(wx, wy, 162) * 12) | 0) * 2 + 2, 4, 4);
+        ctx.fillStyle = "#a88c50";
+        ctx.fillRect(sx + ((hashNoise(wx, wy, 161) * 12) | 0) * 2 + 2,
+                     sy + ((hashNoise(wx, wy, 162) * 12) | 0) * 2 + 2, 4, 2);
+      }
       break;
     }
     case T_CAVE: { // dungeon entrance (cave)
       drawTile(T_MOUNTAIN, sx, sy, wx, wy);
+      // rocky rim framing the opening
+      ctx.fillStyle = "#8a8a9a";
+      ctx.fillRect(sx + 8, sy + 12, 16, 2);
+      ctx.fillRect(sx + 8, sy + 14, 2, 14);
+      ctx.fillRect(sx + 22, sy + 14, 2, 14);
       ctx.fillStyle = "#000";
       ctx.fillRect(sx + 10, sy + 14, 12, 14);
       ctx.fillRect(sx + 12, sy + 10, 8, 6);
+      // faint inner gloom so the entrance reads as deep
+      ctx.fillStyle = "#181820";
+      ctx.fillRect(sx + 10, sy + 14, 12, 2);
       break;
     }
     case T_TOWN: { // town
       drawTile(T_GRASS, sx, sy, wx, wy);
+      // roof with shaded underside and ridge highlight
       ctx.fillStyle = "#a04030";
       ctx.beginPath();
       ctx.moveTo(sx + 2, sy + 14); ctx.lineTo(sx + 16, sy + 2); ctx.lineTo(sx + 30, sy + 14);
       ctx.fill();
+      ctx.fillStyle = "#c05840";
+      ctx.beginPath();
+      ctx.moveTo(sx + 8, sy + 9); ctx.lineTo(sx + 16, sy + 2); ctx.lineTo(sx + 24, sy + 9);
+      ctx.fill();
+      ctx.fillStyle = "#802818";
+      ctx.fillRect(sx + 2, sy + 12, 28, 2);
+      // chimney
+      ctx.fillStyle = "#706068";
+      ctx.fillRect(sx + 22, sy + 3, 4, 7);
+      // walls with timber framing, door, and lit window
       ctx.fillStyle = "#c8a870";
       ctx.fillRect(sx + 6, sy + 14, 20, 14);
+      ctx.fillStyle = "#8a6a3a";
+      ctx.fillRect(sx + 6, sy + 14, 20, 1);
+      ctx.fillRect(sx + 6, sy + 14, 1, 14);
+      ctx.fillRect(sx + 25, sy + 14, 1, 14);
       ctx.fillStyle = "#503820";
       ctx.fillRect(sx + 13, sy + 18, 6, 10);
+      ctx.fillStyle = "#e8c840";
+      ctx.fillRect(sx + 17, sy + 24, 1, 1); // door handle
+      ctx.fillStyle = "#f0d878";
+      ctx.fillRect(sx + 21, sy + 18, 3, 3); // warm window glow
       break;
     }
   }
@@ -981,11 +1119,21 @@ function render() {
     if (e.kind === "monster") spr = SPRITES[MONSTERS[e.type].spr];
     else if (e.kind === "chest") spr = SPRITES.chest;
     else if (e.kind === "stairs") spr = SPRITES.stairs;
-    if (spr) ctx.drawImage(spr, vx * TILE - offX, vy * TILE - offY);
+    if (spr) {
+      const ex = vx * TILE - offX, ey = vy * TILE - offY;
+      if (e.kind !== "stairs") { // soft ground shadow
+        ctx.fillStyle = "rgba(0,0,0,0.25)";
+        ctx.fillRect(ex + 6, ey + 28, 20, 3);
+      }
+      ctx.drawImage(spr, ex, ey);
+    }
   }
   // player with idle bob
   const bob = (G.tick >> 4) % 2;
-  ctx.drawImage(SPRITES[G.player.cls], Math.round((ipx - camX) * TILE), Math.round((ipy - camY) * TILE) - bob);
+  const pxs = Math.round((ipx - camX) * TILE), pys = Math.round((ipy - camY) * TILE);
+  ctx.fillStyle = "rgba(0,0,0,0.25)";
+  ctx.fillRect(pxs + 6, pys + 29, 20, 3);
+  ctx.drawImage(SPRITES[G.player.cls], pxs, pys - bob);
 
   // area label
   ctx.fillStyle = "rgba(0,0,0,0.6)";
