@@ -1178,13 +1178,16 @@ cv.addEventListener("click", () => cv.focus());
 // maps to a whole number of device pixels; when integer snapping would waste
 // too much screen (or the screen is smaller than 1:1 device pixels), fall
 // back to smooth downscaling, which looks far better than rough pixelation.
+const CRISP_THRESHOLD = 0.8; // only snap to integer scaling if it keeps >=80% of the available width
 function fitCanvas() {
   const dpr = window.devicePixelRatio || 1;
-  const border = 8, bodyPad = 20; // canvas border (4px x2) + body padding (10px x2)
-  const avail = Math.min(480, document.documentElement.clientWidth - bodyPad - border);
+  const cvStyle = getComputedStyle(cv), bodyStyle = getComputedStyle(document.body);
+  const border = parseFloat(cvStyle.borderLeftWidth) + parseFloat(cvStyle.borderRightWidth);
+  const bodyPad = parseFloat(bodyStyle.paddingLeft) + parseFloat(bodyStyle.paddingRight);
+  const avail = Math.min(cv.width, document.documentElement.clientWidth - bodyPad - border);
   const devicePx = Math.floor((avail * dpr) / cv.width) * cv.width;
   const crispCss = devicePx / dpr;
-  if (devicePx >= cv.width && crispCss >= 0.8 * avail) {
+  if (devicePx >= cv.width && crispCss >= CRISP_THRESHOLD * avail) {
     cv.style.width = crispCss + "px";
     cv.style.height = crispCss + "px";
     cv.style.imageRendering = "pixelated";
