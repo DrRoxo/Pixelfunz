@@ -25,6 +25,8 @@ Works on mobile too: on touch devices an on-screen D-pad and action buttons appe
 | 3 | Defend (+4 AC) |
 | 4 | Flee |
 | H | Drink a healing potion |
+| P | Save game (while exploring) |
+| L | Load saved game (also from title/game-over screens) |
 | Enter | Confirm / start |
 
 Gravity applies: walk off a ledge and you'll fall until you land. Water pools let you swim along at any depth.
