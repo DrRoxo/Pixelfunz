@@ -7,8 +7,8 @@
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
-    background: #1a1423;
-    color: #e8d8b0;
+    background: #0c0b0e;
+    color: #b8b0a0;
     font-family: 'Courier New', monospace;
     display: flex;
     flex-direction: column;
@@ -16,12 +16,12 @@
     min-height: 100vh;
     padding: 10px;
   }
-  h1 { color: #f0c060; text-shadow: 2px 2px #402810; letter-spacing: 3px; margin: 8px 0; }
+  h1 { color: #a08048; text-shadow: 2px 2px #1a1208; letter-spacing: 3px; margin: 8px 0; }
   #game-wrap { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
   canvas {
     image-rendering: pixelated;
     image-rendering: crisp-edges;
-    border: 4px solid #6b4a2a;
+    border: 4px solid #3a3230;
     background: #000;
     outline: none;
     box-sizing: content-box;
@@ -33,28 +33,28 @@
     gap: 8px;
   }
   .panel {
-    border: 3px solid #6b4a2a;
-    background: #241a2e;
+    border: 3px solid #3a3230;
+    background: #14121a;
     padding: 8px;
     font-size: 13px;
   }
-  .panel h3 { color: #f0c060; font-size: 13px; margin-bottom: 4px; border-bottom: 1px solid #6b4a2a; }
+  .panel h3 { color: #a08048; font-size: 13px; margin-bottom: 4px; border-bottom: 1px solid #3a3230; }
   #log {
     height: 220px;
     overflow-y: auto;
     line-height: 1.5;
   }
-  #log .roll { color: #8fd0ff; }
-  #log .dmg { color: #ff8f8f; }
-  #log .good { color: #9fe89f; }
-  #log .crit { color: #ffd700; font-weight: bold; }
-  #log .sys { color: #b09fd0; }
-  .bar { background: #402030; height: 12px; border: 1px solid #6b4a2a; margin: 2px 0 6px; }
+  #log .roll { color: #6a90a8; }
+  #log .dmg { color: #b05848; }
+  #log .good { color: #7a9068; }
+  #log .crit { color: #c8a030; font-weight: bold; }
+  #log .sys { color: #7a6f90; }
+  .bar { background: #241418; height: 12px; border: 1px solid #3a3230; margin: 2px 0 6px; }
   .bar > div { height: 100%; transition: width 0.3s; }
-  #hpbar > div { background: linear-gradient(#e05050, #a02020); }
-  #xpbar > div { background: linear-gradient(#50a0e0, #204880); }
-  #controls { font-size: 11px; color: #a08868; }
-  kbd { background: #402810; padding: 0 4px; border-radius: 3px; color: #f0c060; }
+  #hpbar > div { background: linear-gradient(#8a2820, #5a1410); }
+  #xpbar > div { background: linear-gradient(#3a6080, #182c48); }
+  #controls { font-size: 11px; color: #6a6050; }
+  kbd { background: #1c1610; padding: 0 4px; border-radius: 3px; color: #a08048; }
   /* Touch controls: shown only on touch (coarse-pointer) devices */
   #touch-controls {
     display: none;
@@ -68,15 +68,15 @@
     touch-action: manipulation;
   }
   #touch-controls button {
-    background: #241a2e;
-    border: 3px solid #6b4a2a;
-    color: #f0c060;
+    background: #14121a;
+    border: 3px solid #3a3230;
+    color: #a08048;
     font-family: 'Courier New', monospace;
     font-size: 16px;
     border-radius: 6px;
     touch-action: manipulation;
   }
-  #touch-controls button:active { background: #402810; }
+  #touch-controls button:active { background: #1c1610; }
   #dpad {
     display: grid;
     grid-template-areas: ". up ." "left . right" ". down .";
@@ -191,21 +191,21 @@ function log(msg, cls) {
 // Sprites are 16x16 grids of palette indices, scaled 2x to 32px.
 const PAL = {
   ".": null,        // transparent
-  "0": "#000000", "s": "#e8b888", "S": "#c08858", // skin
-  "h": "#6b3a1a", "H": "#3a2410",                 // hair
-  "r": "#c03030", "R": "#801818",                 // red
-  "b": "#3858c0", "B": "#203070",                 // blue
-  "g": "#38a048", "G": "#1f6030",                 // green
-  "y": "#e8c840", "Y": "#a88820",                 // gold
-  "w": "#e8e8e8", "W": "#a0a0b0",                 // white/steel
-  "m": "#888898", "M": "#505060",                 // metal
-  "p": "#9048c0", "P": "#582880",                 // purple
-  "k": "#403040", "K": "#201828",                 // dark
-  "n": "#8a6a3a", "N": "#5a4020",                 // brown
-  "o": "#e88030", "O": "#a05010",                 // orange
-  "e": "#c8e858", "E": "#7fa030",                 // sick green
-  "f": "#ff6820", "F": "#c03000",                 // fire
-  "q": "#d8d0c0", "Q": "#989080",                 // bone
+  "0": "#000000", "s": "#b09070", "S": "#806048", // skin
+  "h": "#4a2c16", "H": "#26180c",                 // hair
+  "r": "#8a2822", "R": "#521410",                 // red
+  "b": "#2c4070", "B": "#1a2444",                 // blue
+  "g": "#3a5c34", "G": "#233a20",                 // green
+  "y": "#b09030", "Y": "#786018",                 // gold
+  "w": "#b8b8bc", "W": "#787884",                 // white/steel
+  "m": "#6a6a74", "M": "#3c3c46",                 // metal
+  "p": "#5e3480", "P": "#3a1e54",                 // purple
+  "k": "#2c222c", "K": "#16101a",                 // dark
+  "n": "#6a5230", "N": "#44301a",                 // brown
+  "o": "#a85e28", "O": "#703a10",                 // orange
+  "e": "#8ca444", "E": "#5a7226",                 // sick green
+  "f": "#c85018", "F": "#8a2400",                 // fire
+  "q": "#aaa294", "Q": "#6e685c",                 // bone
 };
 function makeSprite(rows) {
   const off = document.createElement("canvas");
@@ -387,27 +387,27 @@ function hashNoise(x, y, s) {
 function drawTile(type, sx, sy, wx, wy) {
   switch (type) {
     case T_GRASS: { // grass-topped ground block (side view)
-      ctx.fillStyle = "#7a5230";
+      ctx.fillStyle = "#4a3420";
       ctx.fillRect(sx, sy, TILE, TILE);
       for (let i = 0; i < 5; i++) { // dirt speckles
-        ctx.fillStyle = hashNoise(wx, wy, i + 50) > 0.5 ? "#8a6038" : "#6a4628";
+        ctx.fillStyle = hashNoise(wx, wy, i + 50) > 0.5 ? "#584028" : "#3a2c1a";
         ctx.fillRect(sx + ((hashNoise(wx, wy, i) * 14) | 0) * 2, sy + 10 + ((hashNoise(wx, wy, i + 10) * 10) | 0) * 2, 4, 2);
       }
       // grass cap
-      ctx.fillStyle = "#2f7a38";
+      ctx.fillStyle = "#3a4626";
       ctx.fillRect(sx, sy, TILE, 8);
-      ctx.fillStyle = "#3a8f44";
+      ctx.fillStyle = "#48562e";
       ctx.fillRect(sx, sy, TILE, 3);
       // grass blades poking up along the surface
       for (let i = 0; i < 4; i++) {
         const bx = sx + ((hashNoise(wx, wy, i + 60) * 15) | 0) * 2;
-        ctx.fillStyle = hashNoise(wx, wy, i + 65) > 0.5 ? "#4aa050" : "#276830";
+        ctx.fillStyle = hashNoise(wx, wy, i + 65) > 0.5 ? "#56643a" : "#28321c";
         ctx.fillRect(bx, sy, 2, 4 + ((hashNoise(wx, wy, i + 70) * 3) | 0) * 2);
       }
       // ragged grass-to-dirt edge
       for (let i = 0; i < 4; i++) {
         if (hashNoise(wx, wy, i + 75) > 0.5) {
-          ctx.fillStyle = "#2f7a38";
+          ctx.fillStyle = "#3a4626";
           ctx.fillRect(sx + i * 8 + 2, sy + 8, 4, 2);
         }
       }
@@ -416,24 +416,24 @@ function drawTile(type, sx, sy, wx, wy) {
     case T_TREE: { // tree standing on the ground below (sky behind)
       drawTile(T_SKY, sx, sy, wx, wy);
       // trunk with bark shading
-      ctx.fillStyle = "#5a4020";
+      ctx.fillStyle = "#3a2a16";
       ctx.fillRect(sx + 12, sy + 20, 8, 12);
-      ctx.fillStyle = "#3e2a12";
+      ctx.fillStyle = "#241a0c";
       ctx.fillRect(sx + 17, sy + 20, 3, 12);
-      ctx.fillStyle = "#6e5228";
+      ctx.fillStyle = "#48381e";
       ctx.fillRect(sx + 12, sy + 20, 2, 12);
       // layered canopy: dark base, mid tone, sunlit top
-      ctx.fillStyle = "#1c5228";
+      ctx.fillStyle = "#1e2c18";
       ctx.fillRect(sx + 4, sy + 4, 24, 18);
-      ctx.fillStyle = "#256b34";
+      ctx.fillStyle = "#2a3a20";
       ctx.fillRect(sx + 8, sy + 2, 16, 8);
       ctx.fillRect(sx + 6, sy + 8, 8, 8);
-      ctx.fillStyle = "#2f8040";
+      ctx.fillStyle = "#364828";
       ctx.fillRect(sx + 10, sy + 4, 8, 4);
       ctx.fillRect(sx + 8, sy + 10, 4, 4);
       // deterministic leaf speckles
       for (let i = 0; i < 4; i++) {
-        ctx.fillStyle = hashNoise(wx, wy, i + 90) > 0.5 ? "#38914a" : "#154020";
+        ctx.fillStyle = hashNoise(wx, wy, i + 90) > 0.5 ? "#405430" : "#141e10";
         ctx.fillRect(sx + 6 + ((hashNoise(wx, wy, i + 95) * 10) | 0) * 2,
                      sy + 5 + ((hashNoise(wx, wy, i + 100) * 7) | 0) * 2, 2, 2);
       }
@@ -441,9 +441,9 @@ function drawTile(type, sx, sy, wx, wy) {
     }
     case T_WATER: { // water
       // deep-to-shallow banding for a sense of depth
-      ctx.fillStyle = "#1e4a8a";
+      ctx.fillStyle = "#122430";
       ctx.fillRect(sx, sy, TILE, TILE);
-      ctx.fillStyle = "#183e78";
+      ctx.fillStyle = "#0c1a24";
       for (let i = 0; i < 3; i++) {
         ctx.fillRect(sx + ((hashNoise(wx, wy, i + 30) * 12) | 0) * 2,
                      sy + ((hashNoise(wx, wy, i + 40) * 12) | 0) * 2, 10, 4);
@@ -451,105 +451,105 @@ function drawTile(type, sx, sy, wx, wy) {
       const ph = (Date.now() / 600 + wx + wy) | 0;
       for (let i = 0; i < 4; i++) {
         const n = hashNoise(wx, wy, i + ph % 3);
-        ctx.fillStyle = "#3a6ab0";
+        ctx.fillStyle = "#22404e";
         ctx.fillRect(sx + ((n * 12) | 0) * 2, sy + ((hashNoise(wx, wy, i + 9) * 14) | 0) * 2, 8, 2);
       }
       // animated glints riding the wave crests
       for (let i = 0; i < 2; i++) {
         const n = hashNoise(wx, wy, i + 5 + ph % 3);
-        ctx.fillStyle = "#7ea8d8";
+        ctx.fillStyle = "#48687a";
         ctx.fillRect(sx + ((n * 13) | 0) * 2, sy + ((hashNoise(wx, wy, i + 15) * 14) | 0) * 2, 4, 2);
       }
       break;
     }
     case T_MOUNTAIN: { // solid rock block
-      ctx.fillStyle = "#5a5a66";
+      ctx.fillStyle = "#3c3c44";
       ctx.fillRect(sx, sy, TILE, TILE);
       // chunky stone facets
       for (let i = 0; i < 5; i++) {
-        ctx.fillStyle = hashNoise(wx, wy, i + 110) > 0.5 ? "#6a6a78" : "#4c4c58";
+        ctx.fillStyle = hashNoise(wx, wy, i + 110) > 0.5 ? "#4a4a54" : "#30303a";
         ctx.fillRect(sx + ((hashNoise(wx, wy, i + 115) * 12) | 0) * 2,
                      sy + ((hashNoise(wx, wy, i + 120) * 12) | 0) * 2, 8, 6);
       }
       // crevice lines
-      ctx.fillStyle = "#3e3e48";
+      ctx.fillStyle = "#26262e";
       if (hashNoise(wx, wy, 125) > 0.5) {
         ctx.fillRect(sx + ((hashNoise(wx, wy, 126) * 12) | 0) * 2 + 2, sy + 4, 2, 12);
         ctx.fillRect(sx + ((hashNoise(wx, wy, 126) * 12) | 0) * 2 + 4, sy + 16, 2, 8);
       }
       // top-edge highlight
-      ctx.fillStyle = "#78788a";
+      ctx.fillStyle = "#54545e";
       ctx.fillRect(sx, sy, TILE, 3);
       break;
     }
     case T_FLOOR: { // dungeon room/corridor air (carved-out space)
-      ctx.fillStyle = "#3a3242";
+      ctx.fillStyle = "#26202c";
       ctx.fillRect(sx, sy, TILE, TILE);
-      ctx.fillStyle = "#443a4e";
+      ctx.fillStyle = "#2e2836";
       if (hashNoise(wx, wy, 3) > 0.6) ctx.fillRect(sx + 8, sy + 8, 6, 6);
       // cracks and pebbles worn into the flagstones
       const cn = hashNoise(wx, wy, 130);
       if (cn > 0.7) {
-        ctx.fillStyle = "#2a2432";
+        ctx.fillStyle = "#181420";
         const cx2 = sx + ((hashNoise(wx, wy, 131) * 10) | 0) * 2 + 4;
         const cy2 = sy + ((hashNoise(wx, wy, 132) * 10) | 0) * 2 + 4;
         ctx.fillRect(cx2, cy2, 6, 2);
         ctx.fillRect(cx2 + 4, cy2 + 2, 2, 4);
       }
       if (hashNoise(wx, wy, 135) > 0.75) {
-        ctx.fillStyle = "#4e4458";
+        ctx.fillStyle = "#38303e";
         ctx.fillRect(sx + ((hashNoise(wx, wy, 136) * 13) | 0) * 2,
                      sy + ((hashNoise(wx, wy, 137) * 13) | 0) * 2, 2, 2);
       }
-      ctx.strokeStyle = "#2a2432";
+      ctx.strokeStyle = "#181420";
       ctx.strokeRect(sx + 0.5, sy + 0.5, TILE - 1, TILE - 1);
       break;
     }
     case T_WALL: { // dungeon wall
-      ctx.fillStyle = "#1a1422";
+      ctx.fillStyle = "#100c16";
       ctx.fillRect(sx, sy, TILE, TILE);
-      ctx.fillStyle = "#2e2438";
+      ctx.fillStyle = "#201826";
       ctx.fillRect(sx + 1, sy + 1, 14, 6); ctx.fillRect(sx + 17, sy + 1, 14, 6);
       ctx.fillRect(sx + 1, sy + 9, 6, 6); ctx.fillRect(sx + 9, sy + 9, 22, 6);
       ctx.fillRect(sx + 1, sy + 17, 14, 6); ctx.fillRect(sx + 17, sy + 17, 14, 6);
       ctx.fillRect(sx + 1, sy + 25, 6, 6); ctx.fillRect(sx + 9, sy + 25, 22, 6);
       // top-edge highlight on each brick to catch torchlight
-      ctx.fillStyle = "#3a2e48";
+      ctx.fillStyle = "#282034";
       ctx.fillRect(sx + 1, sy + 1, 14, 2); ctx.fillRect(sx + 17, sy + 1, 14, 2);
       ctx.fillRect(sx + 1, sy + 9, 6, 2); ctx.fillRect(sx + 9, sy + 9, 22, 2);
       ctx.fillRect(sx + 1, sy + 17, 14, 2); ctx.fillRect(sx + 17, sy + 17, 14, 2);
       ctx.fillRect(sx + 1, sy + 25, 6, 2); ctx.fillRect(sx + 9, sy + 25, 22, 2);
       // deterministic chips and moss on some bricks
       if (hashNoise(wx, wy, 140) > 0.65) {
-        ctx.fillStyle = "#241c2c";
+        ctx.fillStyle = "#160f1c";
         ctx.fillRect(sx + ((hashNoise(wx, wy, 141) * 12) | 0) * 2 + 2,
                      sy + ((hashNoise(wx, wy, 142) * 3) | 0) * 8 + 3, 4, 2);
       }
       if (hashNoise(wx, wy, 145) > 0.85) {
-        ctx.fillStyle = "#2c4030";
+        ctx.fillStyle = "#1e2c20";
         ctx.fillRect(sx + ((hashNoise(wx, wy, 146) * 12) | 0) * 2 + 2,
                      sy + ((hashNoise(wx, wy, 147) * 3) | 0) * 8 + 4, 4, 2);
       }
       break;
     }
     case T_SAND: { // sand/path
-      ctx.fillStyle = "#c8a860";
+      ctx.fillStyle = "#786650";
       ctx.fillRect(sx, sy, TILE, TILE);
       for (let i = 0; i < 4; i++) {
-        ctx.fillStyle = "#b89850";
+        ctx.fillStyle = "#685840";
         ctx.fillRect(sx + ((hashNoise(wx, wy, i) * 14) | 0) * 2, sy + ((hashNoise(wx, wy, i + 20) * 14) | 0) * 2, 4, 2);
       }
       // lighter wind-blown grains and the odd pebble
       for (let i = 0; i < 3; i++) {
-        ctx.fillStyle = "#d8bc78";
+        ctx.fillStyle = "#8a7860";
         ctx.fillRect(sx + ((hashNoise(wx, wy, i + 150) * 14) | 0) * 2,
                      sy + ((hashNoise(wx, wy, i + 155) * 14) | 0) * 2, 2, 2);
       }
       if (hashNoise(wx, wy, 160) > 0.8) {
-        ctx.fillStyle = "#907840";
+        ctx.fillStyle = "#524430";
         ctx.fillRect(sx + ((hashNoise(wx, wy, 161) * 12) | 0) * 2 + 2,
                      sy + ((hashNoise(wx, wy, 162) * 12) | 0) * 2 + 2, 4, 4);
-        ctx.fillStyle = "#a88c50";
+        ctx.fillStyle = "#605038";
         ctx.fillRect(sx + ((hashNoise(wx, wy, 161) * 12) | 0) * 2 + 2,
                      sy + ((hashNoise(wx, wy, 162) * 12) | 0) * 2 + 2, 4, 2);
       }
@@ -557,16 +557,16 @@ function drawTile(type, sx, sy, wx, wy) {
     }
     case T_CAVE: { // dungeon entrance: rocky mound with a dark opening (sky behind)
       drawTile(T_SKY, sx, sy, wx, wy);
-      ctx.fillStyle = "#5a5a66";
+      ctx.fillStyle = "#3c3c44";
       ctx.beginPath();
       ctx.moveTo(sx, sy + 32); ctx.lineTo(sx + 6, sy + 8); ctx.lineTo(sx + 16, sy + 2);
       ctx.lineTo(sx + 26, sy + 8); ctx.lineTo(sx + 32, sy + 32);
       ctx.fill();
-      ctx.fillStyle = "#6a6a78";
+      ctx.fillStyle = "#4a4a54";
       ctx.fillRect(sx + 10, sy + 4, 12, 4);
       ctx.fillRect(sx + 6, sy + 10, 6, 4);
       // rocky rim framing the opening
-      ctx.fillStyle = "#8a8a9a";
+      ctx.fillStyle = "#5e5e6a";
       ctx.fillRect(sx + 8, sy + 12, 16, 2);
       ctx.fillRect(sx + 8, sy + 14, 2, 18);
       ctx.fillRect(sx + 22, sy + 14, 2, 18);
@@ -574,67 +574,67 @@ function drawTile(type, sx, sy, wx, wy) {
       ctx.fillRect(sx + 10, sy + 14, 12, 18);
       ctx.fillRect(sx + 12, sy + 10, 8, 6);
       // faint inner gloom so the entrance reads as deep
-      ctx.fillStyle = "#181820";
+      ctx.fillStyle = "#0c0c12";
       ctx.fillRect(sx + 10, sy + 14, 12, 2);
       break;
     }
     case T_TOWN: { // town house standing on the ground below (sky behind)
       drawTile(T_SKY, sx, sy, wx, wy);
       // roof with shaded underside and ridge highlight
-      ctx.fillStyle = "#a04030";
+      ctx.fillStyle = "#5e2c22";
       ctx.beginPath();
       ctx.moveTo(sx + 2, sy + 14); ctx.lineTo(sx + 16, sy + 2); ctx.lineTo(sx + 30, sy + 14);
       ctx.fill();
-      ctx.fillStyle = "#c05840";
+      ctx.fillStyle = "#743a2c";
       ctx.beginPath();
       ctx.moveTo(sx + 8, sy + 9); ctx.lineTo(sx + 16, sy + 2); ctx.lineTo(sx + 24, sy + 9);
       ctx.fill();
-      ctx.fillStyle = "#802818";
+      ctx.fillStyle = "#3c1810";
       ctx.fillRect(sx + 2, sy + 12, 28, 2);
       // chimney
-      ctx.fillStyle = "#706068";
+      ctx.fillStyle = "#3e3438";
       ctx.fillRect(sx + 22, sy + 3, 4, 7);
       // walls with timber framing, door, and lit window
-      ctx.fillStyle = "#c8a870";
+      ctx.fillStyle = "#7a6a4e";
       ctx.fillRect(sx + 6, sy + 14, 20, 18);
-      ctx.fillStyle = "#8a6a3a";
+      ctx.fillStyle = "#4c3c26";
       ctx.fillRect(sx + 6, sy + 14, 20, 1);
       ctx.fillRect(sx + 6, sy + 14, 1, 18);
       ctx.fillRect(sx + 25, sy + 14, 1, 18);
-      ctx.fillStyle = "#503820";
+      ctx.fillStyle = "#2a1e12";
       ctx.fillRect(sx + 13, sy + 20, 6, 12);
-      ctx.fillStyle = "#e8c840";
+      ctx.fillStyle = "#907022";
       ctx.fillRect(sx + 17, sy + 26, 1, 1); // door handle
-      ctx.fillStyle = "#f0d878";
+      ctx.fillStyle = "#a88838";
       ctx.fillRect(sx + 21, sy + 18, 3, 3); // warm window glow
       break;
     }
     case T_SKY: { // open sky with drifting cloud wisps
-      ctx.fillStyle = "#8ec4e8";
+      ctx.fillStyle = "#4a525e";
       ctx.fillRect(sx, sy, TILE, TILE);
       const cn = hashNoise(wx, wy, 170);
       if (cn > 0.82) {
         const cx2 = sx + ((hashNoise(wx, wy, 171) * 8) | 0) * 2;
         const cy2 = sy + ((hashNoise(wx, wy, 172) * 10) | 0) * 2;
-        ctx.fillStyle = "#e8f2fa";
+        ctx.fillStyle = "#666e7a";
         ctx.fillRect(cx2, cy2 + 2, 16, 4);
         ctx.fillRect(cx2 + 4, cy2, 8, 2);
-        ctx.fillStyle = "#c8dcee";
+        ctx.fillStyle = "#565e6a";
         ctx.fillRect(cx2, cy2 + 6, 16, 2);
       }
       break;
     }
     case T_DIRT: { // underground earth block
-      ctx.fillStyle = "#6a4628";
+      ctx.fillStyle = "#3c2c1a";
       ctx.fillRect(sx, sy, TILE, TILE);
       for (let i = 0; i < 6; i++) {
-        ctx.fillStyle = hashNoise(wx, wy, i + 180) > 0.5 ? "#7a5230" : "#583a20";
+        ctx.fillStyle = hashNoise(wx, wy, i + 180) > 0.5 ? "#463420" : "#2c2012";
         ctx.fillRect(sx + ((hashNoise(wx, wy, i + 185) * 14) | 0) * 2,
                      sy + ((hashNoise(wx, wy, i + 190) * 14) | 0) * 2, 6, 4);
       }
       // the odd buried stone
       if (hashNoise(wx, wy, 195) > 0.8) {
-        ctx.fillStyle = "#8a8a8a";
+        ctx.fillStyle = "#565656";
         ctx.fillRect(sx + ((hashNoise(wx, wy, 196) * 11) | 0) * 2 + 2,
                      sy + ((hashNoise(wx, wy, 197) * 11) | 0) * 2 + 2, 6, 4);
       }
@@ -1174,7 +1174,7 @@ function updateHUD() {
 
 // ---------- Rendering ----------
 function drawText(txt, x, y, size, color, align) {
-  ctx.fillStyle = color || "#e8d8b0";
+  ctx.fillStyle = color || "#b8b0a0";
   ctx.font = `bold ${size}px 'Courier New', monospace`;
   ctx.textAlign = align || "left";
   ctx.fillText(txt, x, y);
@@ -1247,68 +1247,68 @@ function render() {
   // area label
   ctx.fillStyle = "rgba(0,0,0,0.6)";
   ctx.fillRect(4, 4, 180, 22);
-  drawText(G.dungeonLevel > 0 ? `Dungeon — Level ${G.dungeonLevel}` : "Overworld", 10, 20, 13, "#f0c060");
+  drawText(G.dungeonLevel > 0 ? `Dungeon — Level ${G.dungeonLevel}` : "Overworld", 10, 20, 13, "#a08048");
 
-  if (G.mode === "gameover") overlay("YOU DIED", "#e05050", "Press Enter to rise again");
-  if (G.mode === "victory") overlay("VICTORY!", "#ffd700", "The dragon is slain! Enter to replay");
+  if (G.mode === "gameover") overlay("YOU DIED", "#8a2822", "Press Enter to rise again");
+  if (G.mode === "victory") overlay("VICTORY!", "#c8a030", "The dragon is slain! Enter to replay");
 }
 
 function overlay(title, color, sub) {
   ctx.fillStyle = "rgba(0,0,0,0.75)";
   ctx.fillRect(0, 0, cv.width, cv.height);
   drawText(title, cv.width / 2, 220, 42, color, "center");
-  drawText(sub, cv.width / 2, 260, 15, "#e8d8b0", "center");
+  drawText(sub, cv.width / 2, 260, 15, "#b8b0a0", "center");
 }
 
 function renderTitle() {
-  ctx.fillStyle = "#100a18";
+  ctx.fillStyle = "#0a070e";
   ctx.fillRect(0, 0, cv.width, cv.height);
   // starfield
   for (let i = 0; i < 40; i++) {
     const n1 = hashNoise(i, 7, 3), n2 = hashNoise(i, 13, 5);
-    ctx.fillStyle = (i + (G.tick >> 5)) % 5 ? "#544a6a" : "#a89ac8";
+    ctx.fillStyle = (i + (G.tick >> 5)) % 5 ? "#3a3448" : "#726a86";
     ctx.fillRect((n1 * 476) | 0, (n2 * 300) | 0, 3, 3);
   }
   ctx.drawImage(SPRITES.dragon, 160, 60, 160, 160);
-  drawText("PIXELFUNZ", cv.width / 2, 280, 44, "#f0c060", "center");
-  drawText("A D&D-Style Pixel Adventure", cv.width / 2, 312, 16, "#b09fd0", "center");
-  if ((G.tick >> 4) % 2) drawText("— Press Enter to begin —", cv.width / 2, 380, 18, "#e8d8b0", "center");
-  drawText("Slay the dragon in Dungeon 3 to win!", cv.width / 2, 430, 13, "#a08868", "center");
+  drawText("PIXELFUNZ", cv.width / 2, 280, 44, "#a08048", "center");
+  drawText("A D&D-Style Pixel Adventure", cv.width / 2, 312, 16, "#7a6f90", "center");
+  if ((G.tick >> 4) % 2) drawText("— Press Enter to begin —", cv.width / 2, 380, 18, "#b8b0a0", "center");
+  drawText("Slay the dragon in Dungeon 3 to win!", cv.width / 2, 430, 13, "#6a6050", "center");
 }
 
 function renderCreate() {
-  ctx.fillStyle = "#100a18";
+  ctx.fillStyle = "#0a070e";
   ctx.fillRect(0, 0, cv.width, cv.height);
-  drawText("CREATE YOUR HERO", cv.width / 2, 50, 24, "#f0c060", "center");
+  drawText("CREATE YOUR HERO", cv.width / 2, 50, 24, "#a08048", "center");
 
   if (G.createStep === 0) {
-    drawText("Choose a class (←/→, Enter):", cv.width / 2, 90, 15, "#e8d8b0", "center");
+    drawText("Choose a class (←/→, Enter):", cv.width / 2, 90, 15, "#b8b0a0", "center");
     CLASS_KEYS.forEach((k, i) => {
       const x = 40 + i * 105;
       const sel = i === G.createClassIdx;
       if (sel) {
-        ctx.strokeStyle = "#f0c060";
+        ctx.strokeStyle = "#a08048";
         ctx.lineWidth = 3;
         ctx.strokeRect(x - 8, 110, 96, 130);
       }
       ctx.drawImage(SPRITES[k], x + 8, 120, 64, 64);
-      drawText(CLASSES[k].name, x + 40, 205, 14, sel ? "#f0c060" : "#a08868", "center");
-      drawText("d" + CLASSES[k].hd + " HD", x + 40, 224, 11, "#8fd0ff", "center");
+      drawText(CLASSES[k].name, x + 40, 205, 14, sel ? "#a08048" : "#6a6050", "center");
+      drawText("d" + CLASSES[k].hd + " HD", x + 40, 224, 11, "#6a90a8", "center");
     });
     const c = CLASSES[CLASS_KEYS[G.createClassIdx]];
-    drawText(`Weapon: ${c.weapon}  ·  AC ${c.ac}`, cv.width / 2, 280, 14, "#9fe89f", "center");
-    drawText(`Primary: ${c.prime.map(s => s.toUpperCase()).join(" & ")}`, cv.width / 2, 305, 14, "#9fe89f", "center");
+    drawText(`Weapon: ${c.weapon}  ·  AC ${c.ac}`, cv.width / 2, 280, 14, "#7a9068", "center");
+    drawText(`Primary: ${c.prime.map(s => s.toUpperCase()).join(" & ")}`, cv.width / 2, 305, 14, "#7a9068", "center");
   } else {
     const s = G.createStats;
-    drawText("Ability Scores (4d6 drop lowest)", cv.width / 2, 95, 15, "#e8d8b0", "center");
+    drawText("Ability Scores (4d6 drop lowest)", cv.width / 2, 95, 15, "#b8b0a0", "center");
     const names = ["str", "dex", "con", "int", "wis", "cha"];
     names.forEach((n, i) => {
       const y = 140 + i * 34;
-      drawText(n.toUpperCase(), 150, y, 18, "#f0c060");
-      drawText(String(s[n]).padStart(2), 240, y, 18, "#e8d8b0");
-      drawText("(" + fmtMod(mod(s[n])) + ")", 290, y, 15, "#8fd0ff");
+      drawText(n.toUpperCase(), 150, y, 18, "#a08048");
+      drawText(String(s[n]).padStart(2), 240, y, 18, "#b8b0a0");
+      drawText("(" + fmtMod(mod(s[n])) + ")", 290, y, 15, "#6a90a8");
     });
-    drawText("R: reroll   ·   Enter: begin adventure", cv.width / 2, 390, 15, "#9fe89f", "center");
+    drawText("R: reroll   ·   Enter: begin adventure", cv.width / 2, 390, 15, "#7a9068", "center");
   }
 }
 
@@ -1317,11 +1317,11 @@ function renderCombat() {
   // backdrop
   const dun = G.dungeonLevel > 0;
   const grd = ctx.createLinearGradient(0, 0, 0, cv.height);
-  grd.addColorStop(0, dun ? "#181020" : "#284a70");
-  grd.addColorStop(1, dun ? "#2a1c30" : "#2f7a38");
+  grd.addColorStop(0, dun ? "#0c0812" : "#33383e");
+  grd.addColorStop(1, dun ? "#1a1220" : "#3e4630");
   ctx.fillStyle = grd;
   ctx.fillRect(0, 0, cv.width, cv.height);
-  ctx.fillStyle = dun ? "#241a2e" : "#256b34";
+  ctx.fillStyle = dun ? "#14101a" : "#2a3220";
   ctx.fillRect(0, 330, cv.width, 150);
 
   // monster
@@ -1341,24 +1341,24 @@ function renderCombat() {
   // monster HP plate
   ctx.fillStyle = "rgba(0,0,0,0.65)";
   ctx.fillRect(260, 60, 200, 50);
-  drawText(cb.name, 270, 80, 15, cb.boss ? "#ffd700" : "#e8d8b0");
-  ctx.fillStyle = "#402030"; ctx.fillRect(270, 90, 180, 10);
-  ctx.fillStyle = "#e05050"; ctx.fillRect(270, 90, 180 * Math.max(0, cb.hp) / cb.hpMax, 10);
+  drawText(cb.name, 270, 80, 15, cb.boss ? "#c8a030" : "#b8b0a0");
+  ctx.fillStyle = "#241418"; ctx.fillRect(270, 90, 180, 10);
+  ctx.fillStyle = "#8a2822"; ctx.fillRect(270, 90, 180 * Math.max(0, cb.hp) / cb.hpMax, 10);
 
   // action menu
   ctx.fillStyle = "rgba(0,0,0,0.7)";
   ctx.fillRect(10, 360, 460, 110);
-  ctx.strokeStyle = "#6b4a2a"; ctx.lineWidth = 2;
+  ctx.strokeStyle = "#3a3230"; ctx.lineWidth = 2;
   ctx.strokeRect(10, 360, 460, 110);
   if (cb.turn === "player") {
     const canSpell = p.cls === "wizard" || p.cls === "cleric";
-    drawText("Your turn:", 24, 384, 14, "#f0c060");
+    drawText("Your turn:", 24, 384, 14, "#a08048");
     drawText(`1) Attack (${CLASSES[p.cls].weapon})`, 24, 408, 14);
-    drawText(canSpell ? `2) Cast Spell [${p.spellUses}]` : "2) —", 24, 430, 14, canSpell ? "#e8d8b0" : "#555");
+    drawText(canSpell ? `2) Cast Spell [${p.spellUses}]` : "2) —", 24, 430, 14, canSpell ? "#b8b0a0" : "#48443c");
     drawText("3) Defend", 24, 452, 14);
     drawText(`4) Flee    H) Potion [${p.potions}]`, 250, 452, 14);
   } else {
-    drawText(`${cb.name} is acting...`, 24, 408, 15, "#ff8f8f");
+    drawText(`${cb.name} is acting...`, 24, 408, 15, "#b05848");
   }
 }
 
