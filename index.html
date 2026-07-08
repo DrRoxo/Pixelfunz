@@ -1244,7 +1244,7 @@ function tryMove(dx, dy) {
 
   const fx = G.px, fy = G.py;
   G.px = nx; G.py = ny;
-  if (dy >= 0) applyGravity(); // climbing up isn't undone by gravity mid-ascent
+  if (dy >= 0 && !canClimb()) applyGravity(); // gravity only when not climbing/clinging
   G.moveAnim = { fx, fy, t0: performance.now() };
 
   // landed on something interesting?
