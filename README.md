@@ -21,7 +21,7 @@ Works on mobile too: on touch devices an on-screen D-pad and action buttons appe
 | ↑ or W | Climb / hop up (needs ground underfoot or a wall to grab) |
 | ↓ or S | Climb down |
 | 1 | Attack |
-| 2 | Cast spell (Wizard/Cleric) |
+| 2 | Skills / Spells (opens submenu; unlocked by leveling up) |
 | 3 | Defend (+4 AC) |
 | 4 | Flee |
 | H | Drink a healing potion |
@@ -38,6 +38,6 @@ On touch devices, an on-screen D-pad and buttons for all of the above are shown 
 - **d20 attack rolls** vs Armor Class, with ability modifiers and proficiency
 - **Critical hits** on natural 20 (double damage dice), fumbles on natural 1
 - **Initiative rolls** at the start of combat
-- Class hit dice (d6–d10), weapon damage dice, sneak attack for Rogues, spell slots for casters
+- Class hit dice (d6–d10), weapon damage dice, sneak attack for Rogues, and level-unlocked skills for every class (Spells for Wizards/Clerics, Stamina skills for Fighters, Tricks for Rogues)
 - Leveling with XP, hit-die HP gains, and full heals
-- Rest at the town inn to restore HP, spells, and buy potions
+- Rest at the town inn to restore HP, skill uses, and buy potions
