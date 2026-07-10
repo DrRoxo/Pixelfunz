@@ -109,7 +109,7 @@
     </div>
     <div id="action-buttons">
       <button type="button" data-key="1" aria-label="Attack">&#9876; Atk</button>
-      <button type="button" data-key="2" aria-label="Cast spell">&#10024; Spl</button>
+      <button type="button" data-key="2" aria-label="Skills and spells">&#10024; Skl</button>
       <button type="button" data-key="3" aria-label="Defend">&#128737; Def</button>
       <button type="button" data-key="4" aria-label="Flee">&#128168; Run</button>
       <button type="button" data-key="h" aria-label="Drink potion">&#129380; Pot</button>
@@ -749,6 +749,40 @@ const CLASSES = {
   cleric:  { name: "Cleric",  hd: 8,  weapon: "Mace",       wDice: [1, 6],  atkStat: "wis", ac: 15, prime: ["wis", "con"] },
 };
 
+// ---------- Class skills (unlocked by level-ups; all spend the shared resource pool) ----------
+// Skill fields: lvl (unlock level), cost (resource spent), dice [n,d] bonus damage,
+// addWeapon (also roll weapon dice), atkBonus (to-hit), auto (never misses),
+// adv (roll 2 d20, keep best), hits (attack rolls), heal [n,d], stun (foe skips a turn),
+// sneak [n,d] (extra sneak-attack dice). The class attack-stat modifier is added to damage/healing.
+const RESOURCE_NAME = { fighter: "Stamina", rogue: "Tricks", wizard: "Spells", cleric: "Spells" };
+const SKILLS = {
+  wizard: [
+    { name: "Magic Missile",  lvl: 1, cost: 1, auto: true, dice: [2, 4],   desc: "auto-hit 2d4" },
+    { name: "Fireball",       lvl: 3, cost: 2, dice: [4, 6], atkBonus: 2,  desc: "4d6 blast" },
+    { name: "Ice Lance",      lvl: 5, cost: 2, dice: [3, 8], atkBonus: 2, stun: true, desc: "3d8, freezes" },
+    { name: "Lightning Storm",lvl: 7, cost: 3, dice: [8, 6], atkBonus: 2,  desc: "8d6 fury" },
+  ],
+  cleric: [
+    { name: "Sacred Flame",   lvl: 1, cost: 1, dice: [2, 6], atkBonus: 2,  desc: "2d6 radiant" },
+    { name: "Healing Word",   lvl: 3, cost: 1, heal: [2, 8],               desc: "heal 2d8" },
+    { name: "Divine Smite",   lvl: 5, cost: 2, dice: [4, 8], atkBonus: 2,  desc: "4d8 holy" },
+    { name: "Holy Wrath",     lvl: 7, cost: 3, dice: [6, 8], atkBonus: 2, stun: true, desc: "6d8, dazes" },
+  ],
+  fighter: [
+    { name: "Power Strike",   lvl: 2, cost: 1, addWeapon: true, dice: [1, 8], desc: "weapon +1d8" },
+    { name: "Double Strike",  lvl: 4, cost: 2, addWeapon: true, hits: 2,      desc: "two attacks" },
+    { name: "Shield Bash",    lvl: 6, cost: 2, dice: [2, 6], stun: true,      desc: "2d6, stuns" },
+    { name: "Berserk Fury",   lvl: 8, cost: 3, addWeapon: true, dice: [3, 10], atkBonus: 2, desc: "weapon +3d10" },
+  ],
+  rogue: [
+    { name: "Precise Strike", lvl: 2, cost: 1, addWeapon: true, atkBonus: 4, sneak: [1, 6], desc: "+4 hit, sneak" },
+    { name: "Poison Blade",   lvl: 4, cost: 2, addWeapon: true, dice: [2, 6],  desc: "weapon +2d6 venom" },
+    { name: "Shadow Step",    lvl: 6, cost: 2, addWeapon: true, adv: true, sneak: [2, 6], desc: "advantage, +sneak" },
+    { name: "Assassinate",    lvl: 8, cost: 3, addWeapon: true, dice: [4, 6], atkBonus: 2, desc: "weapon +4d6" },
+  ],
+};
+function unlockedSkills(p) { return SKILLS[p.cls].filter(s => p.level >= s.lvl); }
+
 // ---------- Monsters ----------
 const MONSTERS = {
   goblin:   { name: "Goblin",        spr: "goblin",   hp: [3, 6, 3],   ac: 13, atk: 4, dmg: [1, 4, 1],  xp: 50,  cr: 1 },
@@ -1028,6 +1062,8 @@ function startCombat(monsterType, entRef) {
     boss: !!M.boss,
     entRef,
     turn: "player",
+    menu: "main",       // main | skills (combat action submenu)
+    stunned: false,     // foe skips its next turn (Shield Bash, Ice Lance...)
     flash: 0,
     playerFlash: 0,
   };
@@ -1078,20 +1114,11 @@ function playerAttack(kind) {
     return;
   }
 
-  // attack / spell
-  let atkMod, nD, dS, dB, label;
-  if (kind === "spell") {
-    if (p.cls !== "wizard" && p.cls !== "cleric") { log("You don't know any spells!", "dmg"); return; }
-    if (p.spellUses <= 0) { log("Out of spell slots!", "dmg"); return; }
-    p.spellUses--;
-    if (p.cls === "wizard") { atkMod = mod(p.stats.int) + 2; nD = 2; dS = 8; dB = mod(p.stats.int); label = "Magic Missile barrage"; }
-    else { atkMod = mod(p.stats.wis) + 2; nD = 2; dS = 6; dB = mod(p.stats.wis); label = "Sacred Flame"; }
-  } else {
-    const st = p.stats[c.atkStat];
-    atkMod = mod(st) + 2; // proficiency
-    nD = c.wDice[0]; dS = c.wDice[1]; dB = mod(st);
-    label = c.weapon;
-  }
+  // basic weapon attack
+  const st = p.stats[c.atkStat];
+  const atkMod = mod(st) + 2; // proficiency
+  const nD = c.wDice[0], dS = c.wDice[1], dB = mod(st);
+  const label = c.weapon;
 
   const d20 = roll(20);
   const total = d20 + atkMod;
@@ -1117,6 +1144,66 @@ function playerAttack(kind) {
   endPlayerTurn();
 }
 
+// Use the i-th unlocked class skill (spends the shared resource pool).
+function useSkill(i) {
+  const cb = G.combat, p = G.player, c = CLASSES[p.cls];
+  if (!cb || cb.turn !== "player") return;
+  const sk = unlockedSkills(p)[i];
+  if (!sk) return;
+  if (p.spellUses < sk.cost) { log(`Not enough ${RESOURCE_NAME[p.cls].toLowerCase()}!`, "dmg"); return; }
+  p.spellUses -= sk.cost;
+  p.defending = false;
+  cb.menu = "main";
+  const stat = mod(p.stats[c.atkStat]);
+
+  if (sk.heal) { // self-heal, no attack roll
+    const heal = Math.max(1, rollDice(sk.heal[0], sk.heal[1], stat));
+    p.hp = Math.min(p.hpMax, p.hp + heal);
+    log(`${sk.name}: you heal ${heal} HP.`, "good");
+    updateHUD();
+    endPlayerTurn();
+    return;
+  }
+
+  const atkMod = stat + 2 + (sk.atkBonus || 0);
+  const hits = sk.hits || 1;
+  let anyHit = false;
+  for (let h = 0; h < hits; h++) {
+    let d20 = roll(20);
+    if (sk.adv) d20 = Math.max(d20, roll(20));
+    const total = d20 + atkMod, crit = d20 === 20;
+    if (sk.auto) {
+      log(`${sk.name}: the bolts strike unerringly!`, "roll");
+    } else {
+      log(`${sk.name}: d20(${d20})${fmtMod(atkMod)} = ${total} vs AC ${cb.ac}`, "roll");
+    }
+    if (!sk.auto && d20 === 1) { log("Critical miss!", "dmg"); continue; }
+    if (sk.auto || crit || total >= cb.ac) {
+      anyHit = true;
+      let dmg = stat;
+      if (sk.dice) dmg += rollDice(crit ? sk.dice[0] * 2 : sk.dice[0], sk.dice[1]);
+      if (sk.addWeapon) dmg += rollDice(crit ? c.wDice[0] * 2 : c.wDice[0], c.wDice[1]);
+      if (sk.sneak) {
+        const s = rollDice(sk.sneak[0], sk.sneak[1]);
+        dmg += s;
+        log(`Sneak attack! +${s} damage.`, "crit");
+      }
+      dmg = Math.max(1, dmg);
+      cb.hp -= dmg;
+      cb.flash = 8;
+      log(crit ? `CRITICAL HIT! ${dmg} damage!` : `${sk.name} hits! ${dmg} damage.`, crit ? "crit" : "good");
+      if (cb.hp <= 0) { winCombat(); return; }
+    } else {
+      log("Miss!", "dmg");
+    }
+  }
+  if (anyHit && sk.stun) {
+    cb.stunned = true;
+    log(`${cb.name} is stunned and will lose its next turn!`, "crit");
+  }
+  endPlayerTurn();
+}
+
 function endPlayerTurn() {
   if (!G.combat) return;
   G.combat.turn = "monster";
@@ -1126,6 +1213,13 @@ function endPlayerTurn() {
 function monsterTurn() {
   const cb = G.combat, p = G.player;
   if (!cb) return;
+  if (cb.stunned) {
+    cb.stunned = false;
+    log(`${cb.name} is stunned and cannot act!`, "good");
+    p.defending = false;
+    cb.turn = "player";
+    return;
+  }
   const effAC = p.ac + (p.defending ? 4 : 0);
   const d20 = roll(20);
   const total = d20 + cb.atk;
@@ -1183,6 +1277,9 @@ function levelUp() {
   p.hp = p.hpMax;
   p.spellUses = 3 + Math.floor(p.level / 2);
   log(`⬆ Level ${p.level}! Max HP +${gain}, fully healed.`, "crit");
+  for (const s of SKILLS[p.cls]) {
+    if (s.lvl === p.level) log(`New skill unlocked: ${s.name} (${s.desc})!`, "crit");
+  }
 }
 
 // ---------- Exploration ----------
@@ -1267,7 +1364,7 @@ function tryMove(dx, dy) {
       p.hp = p.hpMax;
       p.spellUses = 3 + Math.floor(p.level / 2);
       if (p.gold >= POTION_COST && p.potions < MAX_POTIONS) { p.gold -= POTION_COST; p.potions++; log(`Bought a potion for ${POTION_COST} gold.`, "good"); }
-      log("You rest at the inn. HP and spells restored.", "good");
+      log("You rest at the inn. HP and skill uses restored.", "good");
       updateHUD();
     }
     return;
@@ -1318,7 +1415,7 @@ function updateHUD() {
     `AC ${p.ac} &nbsp;&middot;&nbsp; ${CLASSES[p.cls].weapon}`;
   document.getElementById("invline").innerHTML =
     `&#129380; Potions: ${p.potions} &nbsp;&#128176; Gold: ${p.gold}` +
-    ((p.cls === "wizard" || p.cls === "cleric") ? ` &nbsp;&#10024; Spells: ${p.spellUses}` : "");
+    ` &nbsp;&#10024; ${RESOURCE_NAME[p.cls]}: ${p.spellUses}`;
 }
 
 // ---------- Rendering ----------
@@ -1526,12 +1623,22 @@ function renderCombat() {
   ctx.strokeStyle = "#3a3230"; ctx.lineWidth = 2;
   ctx.strokeRect(10, 360, 460, 110);
   if (cb.turn === "player") {
-    const canSpell = p.cls === "wizard" || p.cls === "cleric";
-    drawText("Your turn:", 24, 384, 14, "#a08048");
-    drawText(`1) Attack (${CLASSES[p.cls].weapon})`, 24, 408, 14);
-    drawText(canSpell ? `2) Cast Spell [${p.spellUses}]` : "2) —", 24, 430, 14, canSpell ? "#b8b0a0" : "#48443c");
-    drawText("3) Defend", 24, 452, 14);
-    drawText(`4) Flee    H) Potion [${p.potions}]`, 250, 452, 14);
+    if (cb.menu === "skills") {
+      const sks = unlockedSkills(p);
+      drawText(`${RESOURCE_NAME[p.cls]}: ${p.spellUses}`, 24, 382, 13, "#a08048");
+      drawText("0) Back", 380, 382, 13, "#6a6050");
+      sks.forEach((s, i) => {
+        const ok = p.spellUses >= s.cost;
+        drawText(`${i + 1}) ${s.name} [${s.cost}] — ${s.desc}`, 24, 402 + i * 18, 12, ok ? "#b8b0a0" : "#48443c");
+      });
+    } else {
+      const sks = unlockedSkills(p);
+      drawText("Your turn:", 24, 384, 14, "#a08048");
+      drawText(`1) Attack (${CLASSES[p.cls].weapon})`, 24, 408, 14);
+      drawText(sks.length ? `2) ${RESOURCE_NAME[p.cls] === "Spells" ? "Spells" : "Skills"} [${p.spellUses}]` : "2) —", 24, 430, 14, sks.length ? "#b8b0a0" : "#48443c");
+      drawText("3) Defend", 24, 452, 14);
+      drawText(`4) Flee    H) Potion [${p.potions}]`, 250, 452, 14);
+    }
   } else {
     drawText(`${cb.name} is acting...`, 24, 408, 15, "#b05848");
   }
@@ -1602,8 +1709,22 @@ function handleInput(k) {
     return;
   }
   if (G.mode === "combat") {
+    const cb = G.combat;
+    if (cb && cb.menu === "skills") {
+      if (k === "0" || k === "Escape") { cb.menu = "main"; return; }
+      const n = parseInt(k, 10);
+      if (n >= 1) {
+        if (n - 1 < unlockedSkills(G.player).length) useSkill(n - 1);
+        else cb.menu = "main"; // out-of-range digit backs out (mobile-friendly)
+      }
+      return;
+    }
     if (k === "1") playerAttack("attack");
-    if (k === "2") playerAttack("spell");
+    if (k === "2") {
+      if (!cb || cb.turn !== "player") return;
+      if (unlockedSkills(G.player).length) cb.menu = "skills";
+      else log("No skills unlocked yet — keep leveling up!", "dmg");
+    }
     if (k === "3") playerAttack("defend");
     if (k === "4") playerAttack("flee");
     if (k === "h" || k === "H") playerAttack("potion");
