@@ -7,6 +7,12 @@
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
+    --touch-dpad-size: 52px;
+    --touch-action-width: 58px;
+    --touch-action-height: 44px;
+    --touch-action-font: 13px;
+    --side-width: 280px;
+    --game-gap: 10px;
     background: #0c0b0e;
     color: #b8b0a0;
     font-family: 'Courier New', monospace;
@@ -17,7 +23,7 @@
     padding: 10px;
   }
   h1 { color: #a08048; text-shadow: 2px 2px #1a1208; letter-spacing: 3px; margin: 8px 0; }
-  #game-wrap { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  #game-wrap { display: flex; gap: var(--game-gap); flex-wrap: wrap; justify-content: center; align-items: flex-start; }
   canvas {
     image-rendering: pixelated;
     image-rendering: crisp-edges;
@@ -27,7 +33,7 @@
     box-sizing: content-box;
   }
   #side {
-    width: 280px;
+    width: var(--side-width);
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -82,15 +88,15 @@
     grid-template-areas: ". up ." "left . right" ". down .";
     gap: 4px;
   }
-  #dpad button { width: 52px; height: 52px; }
+  #dpad button { width: var(--touch-dpad-size); height: var(--touch-dpad-size); }
   #action-buttons {
     display: flex;
     flex-wrap: wrap;
     justify-content: flex-end;
     gap: 6px;
-    max-width: 200px;
+    max-width: calc(var(--touch-action-width) * 3 + 12px);
   }
-  #action-buttons button { min-width: 58px; height: 44px; font-size: 13px; }
+  #action-buttons button { min-width: var(--touch-action-width); height: var(--touch-action-height); font-size: var(--touch-action-font); }
   .ui-btn {
     width: 100%;
     margin-top: 8px;
@@ -163,6 +169,24 @@
     min-width: 110px;
     margin-top: 0;
   }
+  body.compact-ui #game-wrap {
+    flex-direction: column;
+    align-items: center;
+  }
+  body.compact-ui #side {
+    width: min(100%, 480px);
+  }
+  body.fullscreen-ui {
+    padding: 6px;
+    min-height: 100svh;
+  }
+  body.fullscreen-ui h1 {
+    margin: 2px 0 6px;
+    font-size: clamp(20px, 3vw, 32px);
+  }
+  body.fullscreen-ui #side {
+    width: min(100%, 420px);
+  }
   @media (pointer: coarse) {
     #touch-controls { display: flex; }
   }
@@ -186,6 +210,7 @@
       <button type="button" data-key="4" aria-label="Flee">&#128168; Run</button>
       <button type="button" data-key="h" aria-label="Drink potion">&#129380; Pot</button>
       <button type="button" data-key="o" aria-label="Open options">&#9881; Opt</button>
+      <button type="button" id="touch-fullscreen" aria-label="Toggle fullscreen">&#9974; Full</button>
       <button type="button" data-key="r" aria-label="Reroll stats">&#127922; Roll</button>
       <button type="button" data-key="p" aria-label="Save game">&#128190; Sav</button>
       <button type="button" data-key="l" aria-label="Load game">&#128194; Lod</button>
@@ -209,6 +234,7 @@
     <div class="panel" id="controls">
       <kbd>&#8592;&#8594;</kbd> walk &middot; <kbd>&#8593;&#8595;</kbd> climb &middot; <kbd>1-4</kbd> combat actions &middot; <kbd>Enter</kbd> confirm &middot; <kbd>H</kbd> drink potion &middot; <kbd>O</kbd> options &middot; <kbd>P</kbd> save &middot; <kbd>L</kbd> load (works on title too)
       <button type="button" class="ui-btn" id="options-btn" aria-haspopup="dialog" aria-controls="options-modal">&#9881; Options</button>
+      <button type="button" class="ui-btn" id="fullscreen-btn">&#9974; Fullscreen</button>
     </div>
   </div>
 </div>
@@ -246,6 +272,10 @@
         <option value="full">Full</option>
         <option value="reduced">Reduced</option>
       </select>
+    </div>
+    <div class="option-row">
+      <label>Fullscreen</label>
+      <button type="button" class="ui-btn" id="options-fullscreen" style="margin-top: 0;">Toggle fullscreen</button>
     </div>
     <div id="options-actions">
       <button type="button" class="ui-btn" id="options-close">Close</button>
@@ -285,13 +315,35 @@ const T_GRASS = 0, T_TREE = 1, T_WATER = 2, T_MOUNTAIN = 3, T_FLOOR = 4,
 const cv = document.getElementById("c");
 const ctx = cv.getContext("2d");
 const optionsBtn = document.getElementById("options-btn");
+const fullscreenBtn = document.getElementById("fullscreen-btn");
 const optionsModal = document.getElementById("options-modal");
 const optionsCloseBtn = document.getElementById("options-close");
+const optionsFullscreenBtn = document.getElementById("options-fullscreen");
+const touchFullscreenBtn = document.getElementById("touch-fullscreen");
 const windowSizeSel = document.getElementById("opt-window-size");
 const scaleModeSel = document.getElementById("opt-scale-mode");
 const scanlinesSel = document.getElementById("opt-scanlines");
 const combatFlashSel = document.getElementById("opt-combat-flash");
 ctx.imageSmoothingEnabled = false;
+
+function canFullscreen() {
+  return !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
+}
+function fullscreenElement() {
+  return document.fullscreenElement || document.webkitFullscreenElement || null;
+}
+function isFullscreenActive() {
+  return !!fullscreenElement() || G.pseudoFullscreen;
+}
+function updateFullscreenButtons() {
+  const active = isFullscreenActive();
+  const label = active ? "Exit Fullscreen" : "Fullscreen";
+  fullscreenBtn.textContent = active ? "🗗 Exit Fullscreen" : "⛶ Fullscreen";
+  touchFullscreenBtn.textContent = active ? "Exit" : "Full";
+  optionsFullscreenBtn.textContent = canFullscreen()
+    ? `Toggle ${label}`
+    : (active ? "Leave Expanded View" : "Use Expanded View");
+}
 
 function sanitizeVideoSettings(data) {
   const video = { ...DEFAULT_VIDEO_SETTINGS };
@@ -332,6 +384,7 @@ function openOptions() {
   heldKeys.clear();
   G.optionsOpen = true;
   syncVideoForm();
+  updateFullscreenButtons();
   optionsModal.hidden = false;
   optionsModal.setAttribute("aria-hidden", "false");
   windowSizeSel.focus();
@@ -1047,6 +1100,7 @@ const G = {
   createClassIdx: 0,
   createStats: null,
   optionsOpen: false,
+  pseudoFullscreen: false,
   video: loadVideoSettings(),
   tick: 0,
 };
@@ -1966,6 +2020,7 @@ window.addEventListener("blur", () => heldKeys.clear());
 // Touch controls: buttons dispatch the same keys the keyboard handler uses.
 // Movement buttons also register as held so walking continues while pressed.
 document.querySelectorAll("#touch-controls button").forEach((btn) => {
+  if (!btn.dataset.key) return;
   const key = btn.dataset.key;
   btn.addEventListener("pointerdown", (ev) => {
     ev.preventDefault();
@@ -1978,6 +2033,27 @@ document.querySelectorAll("#touch-controls button").forEach((btn) => {
     }
   }
 });
+async function toggleFullscreen() {
+  heldKeys.clear();
+  if (canFullscreen()) {
+    try {
+      if (fullscreenElement()) await (document.exitFullscreen ? document.exitFullscreen() : document.webkitExitFullscreen());
+      else {
+        const root = document.documentElement;
+        if (root.requestFullscreen) await root.requestFullscreen();
+        else if (root.webkitRequestFullscreen) root.webkitRequestFullscreen();
+      }
+      G.pseudoFullscreen = false;
+    } catch (err) {
+      G.pseudoFullscreen = !G.pseudoFullscreen;
+    }
+  } else {
+    G.pseudoFullscreen = !G.pseudoFullscreen;
+  }
+  updateFullscreenButtons();
+  fitCanvas();
+}
+touchFullscreenBtn.addEventListener("click", toggleFullscreen);
 
 cv.focus();
 cv.addEventListener("click", () => cv.focus());
@@ -1989,12 +2065,39 @@ cv.addEventListener("click", () => cv.focus());
 // too much screen (or the screen is smaller than 1:1 device pixels), fall
 // back to smooth downscaling, which looks far better than rough pixelation.
 const CRISP_THRESHOLD = 0.8; // only snap to integer scaling if it keeps >=80% of the available width
+function updateResponsiveUI() {
+  const vw = document.documentElement.clientWidth;
+  const vh = document.documentElement.clientHeight;
+  const coarse = window.matchMedia("(pointer: coarse)").matches;
+  const activeFullscreen = isFullscreenActive();
+  const compact = vw < 860 || (coarse && vw < 1100) || (activeFullscreen && vw < 1200);
+  document.body.classList.toggle("compact-ui", compact);
+  document.body.classList.toggle("fullscreen-ui", activeFullscreen);
+
+  const shortSide = Math.max(320, Math.min(vw, vh));
+  const dpad = coarse ? Math.round(Math.max(48, Math.min(74, shortSide * 0.12))) : 52;
+  const actionWidth = coarse ? Math.round(Math.max(60, Math.min(90, shortSide * 0.15))) : 58;
+  const actionHeight = coarse ? Math.round(Math.max(44, Math.min(64, shortSide * 0.11))) : 44;
+  document.body.style.setProperty("--touch-dpad-size", `${dpad}px`);
+  document.body.style.setProperty("--touch-action-width", `${actionWidth}px`);
+  document.body.style.setProperty("--touch-action-height", `${actionHeight}px`);
+  document.body.style.setProperty("--touch-action-font", `${coarse ? Math.max(13, Math.round(actionHeight * 0.3)) : 13}px`);
+  document.body.style.setProperty("--side-width", compact ? `${Math.min(420, vw - 20)}px` : "280px");
+  document.body.style.setProperty("--game-gap", activeFullscreen ? "6px" : "10px");
+  updateFullscreenButtons();
+}
 function fitCanvas() {
   const dpr = window.devicePixelRatio || 1;
   const cvStyle = getComputedStyle(cv), bodyStyle = getComputedStyle(document.body);
   const border = parseFloat(cvStyle.borderLeftWidth) + parseFloat(cvStyle.borderRightWidth);
-  const bodyPad = parseFloat(bodyStyle.paddingLeft) + parseFloat(bodyStyle.paddingRight);
-  const avail = Math.max(160, document.documentElement.clientWidth - bodyPad - border);
+  const bodyPadX = parseFloat(bodyStyle.paddingLeft) + parseFloat(bodyStyle.paddingRight);
+  const bodyPadY = parseFloat(bodyStyle.paddingTop) + parseFloat(bodyStyle.paddingBottom);
+  const activeFullscreen = isFullscreenActive();
+  const coarse = window.matchMedia("(pointer: coarse)").matches;
+  const widthAvail = Math.max(160, document.documentElement.clientWidth - bodyPadX - border);
+  const reservedHeight = activeFullscreen ? (coarse ? 190 : 90) : 0;
+  const heightAvail = Math.max(160, document.documentElement.clientHeight - bodyPadY - reservedHeight);
+  const avail = Math.max(160, Math.min(widthAvail, heightAvail));
   const requested = G.video.windowSize === "fit" ? avail : Math.min(avail, parseInt(G.video.windowSize, 10) || BASE_CANVAS_SIZE);
   const integerCss = Math.floor((requested * dpr) / BASE_CANVAS_SIZE) * BASE_CANVAS_SIZE / dpr;
   if (G.video.scaleMode === "smooth") {
@@ -2020,10 +2123,14 @@ function fitCanvas() {
     }
   }
 }
-window.addEventListener("resize", fitCanvas);
-window.addEventListener("orientationchange", fitCanvas);
+window.addEventListener("resize", () => { updateResponsiveUI(); fitCanvas(); });
+window.addEventListener("orientationchange", () => { updateResponsiveUI(); fitCanvas(); });
+document.addEventListener("fullscreenchange", () => { updateResponsiveUI(); fitCanvas(); });
+document.addEventListener("webkitfullscreenchange", () => { updateResponsiveUI(); fitCanvas(); });
 optionsBtn.addEventListener("click", openOptions);
+fullscreenBtn.addEventListener("click", toggleFullscreen);
 optionsCloseBtn.addEventListener("click", closeOptions);
+optionsFullscreenBtn.addEventListener("click", toggleFullscreen);
 optionsModal.addEventListener("click", (ev) => {
   if (ev.target === optionsModal) closeOptions();
 });
@@ -2032,6 +2139,7 @@ scaleModeSel.addEventListener("change", () => setVideoSetting("scaleMode", scale
 scanlinesSel.addEventListener("change", () => setVideoSetting("scanlines", scanlinesSel.value));
 combatFlashSel.addEventListener("change", () => setVideoSetting("combatFlash", combatFlashSel.value));
 syncVideoForm();
+updateResponsiveUI();
 fitCanvas();
 
 (function loop() {
