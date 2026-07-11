@@ -11,7 +11,7 @@ No build steps, no dependencies, no external assets — all pixel art is drawn p
 3. Walk across the flat overworld, loot chests, and enter the cave entrances to descend into dungeon-crawler levels of rooms and corridors.
 4. Slay the **Young Dragon** in Dungeon 3 to win!
 
-Works on mobile too: on touch devices an on-screen D-pad and action buttons appear automatically.
+Works on mobile too: on touch devices an on-screen D-pad and action buttons appear automatically, including an Options shortcut for video settings.
 
 ## Controls
 
@@ -25,6 +25,7 @@ Works on mobile too: on touch devices an on-screen D-pad and action buttons appe
 | 3 | Defend (+4 AC) |
 | 4 | Flee |
 | H | Drink a healing potion |
+| O | Open video options |
 | P | Save game (while exploring) |
 | L | Load saved game (also from title/game-over screens) |
 | Enter | Confirm / start |

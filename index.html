@@ -91,6 +91,78 @@
     max-width: 200px;
   }
   #action-buttons button { min-width: 58px; height: 44px; font-size: 13px; }
+  .ui-btn {
+    width: 100%;
+    margin-top: 8px;
+    padding: 8px 10px;
+    background: #14121a;
+    border: 3px solid #3a3230;
+    color: #a08048;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .ui-btn:hover,
+  .ui-btn:focus-visible {
+    background: #1c1610;
+    outline: none;
+  }
+  #options-modal[hidden] { display: none; }
+  #options-modal {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.72);
+    padding: 16px;
+    z-index: 20;
+  }
+  #options-card {
+    width: min(360px, 100%);
+    border: 4px solid #3a3230;
+    background: #14121a;
+    color: #b8b0a0;
+    padding: 16px;
+    box-shadow: 0 0 24px rgba(0, 0, 0, 0.45);
+  }
+  #options-card h2 {
+    color: #a08048;
+    font-size: 20px;
+    margin-bottom: 8px;
+  }
+  #options-card p {
+    color: #7a6f90;
+    font-size: 12px;
+    margin-bottom: 14px;
+  }
+  .option-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 12px;
+    font-size: 13px;
+  }
+  .option-row label { color: #a08048; }
+  .option-row select {
+    width: 100%;
+    background: #0f0d14;
+    border: 2px solid #3a3230;
+    color: #b8b0a0;
+    padding: 6px 8px;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+  }
+  #options-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 8px;
+  }
+  #options-actions .ui-btn {
+    width: auto;
+    min-width: 110px;
+    margin-top: 0;
+  }
   @media (pointer: coarse) {
     #touch-controls { display: flex; }
   }
@@ -113,6 +185,7 @@
       <button type="button" data-key="3" aria-label="Defend">&#128737; Def</button>
       <button type="button" data-key="4" aria-label="Flee">&#128168; Run</button>
       <button type="button" data-key="h" aria-label="Drink potion">&#129380; Pot</button>
+      <button type="button" data-key="o" aria-label="Open options">&#9881; Opt</button>
       <button type="button" data-key="r" aria-label="Reroll stats">&#127922; Roll</button>
       <button type="button" data-key="p" aria-label="Save game">&#128190; Sav</button>
       <button type="button" data-key="l" aria-label="Load game">&#128194; Lod</button>
@@ -134,7 +207,48 @@
       <div id="log" aria-live="polite"></div>
     </div>
     <div class="panel" id="controls">
-      <kbd>&#8592;&#8594;</kbd> walk &middot; <kbd>&#8593;&#8595;</kbd> climb &middot; <kbd>1-4</kbd> combat actions &middot; <kbd>Enter</kbd> confirm &middot; <kbd>H</kbd> drink potion &middot; <kbd>P</kbd> save &middot; <kbd>L</kbd> load (works on title too)
+      <kbd>&#8592;&#8594;</kbd> walk &middot; <kbd>&#8593;&#8595;</kbd> climb &middot; <kbd>1-4</kbd> combat actions &middot; <kbd>Enter</kbd> confirm &middot; <kbd>H</kbd> drink potion &middot; <kbd>O</kbd> options &middot; <kbd>P</kbd> save &middot; <kbd>L</kbd> load (works on title too)
+      <button type="button" class="ui-btn" id="options-btn" aria-haspopup="dialog" aria-controls="options-modal">&#9881; Options</button>
+    </div>
+  </div>
+</div>
+<div id="options-modal" hidden aria-hidden="true">
+  <div id="options-card" role="dialog" aria-modal="true" aria-labelledby="options-title">
+    <h2 id="options-title">&#9881; Video Options</h2>
+    <p>Adjust the game window and visual effects. Changes apply right away.</p>
+    <div class="option-row">
+      <label for="opt-window-size">Window size</label>
+      <select id="opt-window-size">
+        <option value="fit">Auto fit</option>
+        <option value="480">480 × 480</option>
+        <option value="720">720 × 720</option>
+        <option value="960">960 × 960</option>
+      </select>
+    </div>
+    <div class="option-row">
+      <label for="opt-scale-mode">Scaling</label>
+      <select id="opt-scale-mode">
+        <option value="auto">Auto</option>
+        <option value="crisp">Crisp pixels</option>
+        <option value="smooth">Smooth fit</option>
+      </select>
+    </div>
+    <div class="option-row">
+      <label for="opt-scanlines">Scanlines</label>
+      <select id="opt-scanlines">
+        <option value="off">Off</option>
+        <option value="on">On</option>
+      </select>
+    </div>
+    <div class="option-row">
+      <label for="opt-combat-flash">Combat flash</label>
+      <select id="opt-combat-flash">
+        <option value="full">Full</option>
+        <option value="reduced">Reduced</option>
+      </select>
+    </div>
+    <div id="options-actions">
+      <button type="button" class="ui-btn" id="options-close">Close</button>
     </div>
   </div>
 </div>
@@ -152,6 +266,14 @@ const MOVE_MS = 140;                  // duration of the tile-to-tile walk anima
 const COMBAT_DELAY_MS = 700;          // pause before the monster acts
 const RANDOM_ENCOUNTER_CHANCE = 0.03; // per-step ambush chance in dungeons
 const POTION_COST = 25, MAX_POTIONS = 5;
+const BASE_CANVAS_SIZE = TILE * VIEW;
+const VIDEO_SETTINGS_KEY = "pixelfunz-video-v1";
+const DEFAULT_VIDEO_SETTINGS = Object.freeze({
+  windowSize: "fit",
+  scaleMode: "auto",
+  scanlines: "off",
+  combatFlash: "full",
+});
 // Seeded LCG (glibc constants); masks to 2^31-1 and divides to yield [0, 1).
 function makeLCG(seed) {
   let st = seed;
@@ -162,7 +284,64 @@ const T_GRASS = 0, T_TREE = 1, T_WATER = 2, T_MOUNTAIN = 3, T_FLOOR = 4,
       T_WALL = 5, T_SAND = 6, T_CAVE = 7, T_TOWN = 8, T_SKY = 9, T_DIRT = 10;
 const cv = document.getElementById("c");
 const ctx = cv.getContext("2d");
+const optionsBtn = document.getElementById("options-btn");
+const optionsModal = document.getElementById("options-modal");
+const optionsCloseBtn = document.getElementById("options-close");
+const windowSizeSel = document.getElementById("opt-window-size");
+const scaleModeSel = document.getElementById("opt-scale-mode");
+const scanlinesSel = document.getElementById("opt-scanlines");
+const combatFlashSel = document.getElementById("opt-combat-flash");
 ctx.imageSmoothingEnabled = false;
+
+function sanitizeVideoSettings(data) {
+  const video = { ...DEFAULT_VIDEO_SETTINGS };
+  if (!data || typeof data !== "object") return video;
+  if (["fit", "480", "720", "960"].includes(data.windowSize)) video.windowSize = data.windowSize;
+  if (["auto", "crisp", "smooth"].includes(data.scaleMode)) video.scaleMode = data.scaleMode;
+  if (["off", "on"].includes(data.scanlines)) video.scanlines = data.scanlines;
+  if (["full", "reduced"].includes(data.combatFlash)) video.combatFlash = data.combatFlash;
+  return video;
+}
+function loadVideoSettings() {
+  try {
+    return sanitizeVideoSettings(JSON.parse(localStorage.getItem(VIDEO_SETTINGS_KEY) || "null"));
+  } catch (err) {
+    return { ...DEFAULT_VIDEO_SETTINGS };
+  }
+}
+function saveVideoSettings() {
+  try {
+    localStorage.setItem(VIDEO_SETTINGS_KEY, JSON.stringify(G.video));
+  } catch (err) {
+    // Ignore unavailable storage; the session still keeps the current settings.
+  }
+}
+function syncVideoForm() {
+  windowSizeSel.value = G.video.windowSize;
+  scaleModeSel.value = G.video.scaleMode;
+  scanlinesSel.value = G.video.scanlines;
+  combatFlashSel.value = G.video.combatFlash;
+}
+function setVideoSetting(key, value) {
+  G.video = sanitizeVideoSettings({ ...G.video, [key]: value });
+  syncVideoForm();
+  saveVideoSettings();
+  fitCanvas();
+}
+function openOptions() {
+  heldKeys.clear();
+  G.optionsOpen = true;
+  syncVideoForm();
+  optionsModal.hidden = false;
+  optionsModal.setAttribute("aria-hidden", "false");
+  windowSizeSel.focus();
+}
+function closeOptions() {
+  G.optionsOpen = false;
+  optionsModal.hidden = true;
+  optionsModal.setAttribute("aria-hidden", "true");
+  cv.focus();
+}
 
 // ---------- Dice ----------
 function roll(sides) { return 1 + Math.floor(Math.random() * sides); }
@@ -867,6 +1046,8 @@ const G = {
   createStep: 0,
   createClassIdx: 0,
   createStats: null,
+  optionsOpen: false,
+  video: loadVideoSettings(),
   tick: 0,
 };
 
@@ -1428,14 +1609,14 @@ function drawText(txt, x, y, size, color, align) {
 }
 
 function render() {
-  G.tick++;
-  ctx.fillStyle = "#000";
-  ctx.fillRect(0, 0, cv.width, cv.height);
+G.tick++;
+ctx.fillStyle = "#000";
+ctx.fillRect(0, 0, cv.width, cv.height);
 
-  if (G.mode === "title") { renderTitle(); return; }
-  if (G.mode === "create") { renderCreate(); return; }
-  if (G.mode === "combat") { renderCombat(); return; }
-
+if (G.mode === "title") renderTitle();
+else if (G.mode === "create") renderCreate();
+else if (G.mode === "combat") renderCombat();
+else {
   // explore / gameover / victory: draw world
   // Interpolate the player (and camera) between tiles for smooth movement.
   let ipx = G.px, ipy = G.py;
@@ -1499,6 +1680,13 @@ function render() {
   if (G.mode === "gameover") overlay("YOU DIED", "#8a2822", "Press Enter to rise again");
   if (G.mode === "victory") overlay("VICTORY!", "#c8a030", "The dragon is slain! Enter to replay");
 }
+if (G.video.scanlines === "on") {
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,0.18)";
+  for (let y = 0; y < cv.height; y += 4) ctx.fillRect(0, y, cv.width, 2);
+  ctx.restore();
+}
+}
 
 function overlay(title, color, sub) {
   ctx.fillStyle = "rgba(0,0,0,0.75)";
@@ -1520,7 +1708,7 @@ function renderTitle() {
   drawText("PIXELFUNZ", cv.width / 2, 280, 44, "#a08048", "center");
   drawText("A D&D-Style Pixel Adventure", cv.width / 2, 312, 16, "#7a6f90", "center");
   if ((G.tick >> 4) % 2) drawText("— Press Enter to begin —", cv.width / 2, 380, 18, "#b8b0a0", "center");
-  drawText("L: load saved game", cv.width / 2, 408, 13, "#7a6f90", "center");
+  drawText("O: video options  ·  L: load saved game", cv.width / 2, 408, 13, "#7a6f90", "center");
   drawText("Slay the dragon in Dungeon 3 to win!", cv.width / 2, 430, 13, "#6a6050", "center");
 }
 
@@ -1592,7 +1780,7 @@ function renderCombat() {
   ctx.beginPath();
   ctx.ellipse(344, cb.boss ? 296 : 262, cb.boss ? 66 : 52, 10, 0, 0, Math.PI * 2);
   ctx.fill();
-  if (!mFlash || G.tick % 4 < 2) {
+  if (!mFlash || G.video.combatFlash === "reduced" || G.tick % 4 < 2) {
     ctx.drawImage(SPRITES[MONSTERS[cb.type].spr], 280, 130 + mBob, cb.boss ? 160 : 128, cb.boss ? 160 : 128);
   }
   // player (base sprite faces left, so mirror it to face the monster)
@@ -1602,7 +1790,7 @@ function renderCombat() {
   ctx.beginPath();
   ctx.ellipse(118, 348, 40, 8, 0, 0, Math.PI * 2);
   ctx.fill();
-  if (!pFlash || G.tick % 4 < 2) {
+  if (!pFlash || G.video.combatFlash === "reduced" || G.tick % 4 < 2) {
     ctx.save();
     ctx.translate(70 + 96, 250);
     ctx.scale(-1, 1);
@@ -1687,6 +1875,14 @@ function beginAdventure() {
 }
 
 function handleInput(k) {
+  if (G.optionsOpen) {
+    if (k === "Escape" || k === "o" || k === "O") closeOptions();
+    return;
+  }
+  if (k === "o" || k === "O") {
+    openOptions();
+    return;
+  }
   if (G.mode === "title") {
     if (k === "Enter") startCreation();
     if (k === "l" || k === "L") loadGame();
@@ -1752,6 +1948,13 @@ function handleInput(k) {
 
 document.addEventListener("keydown", (ev) => {
   const k = ev.key;
+  if (G.optionsOpen) {
+    if (k === "Escape" || k === "o" || k === "O") {
+      ev.preventDefault();
+      handleInput(k);
+    }
+    return;
+  }
   if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(k)) ev.preventDefault();
   if (MOVE_KEYS[k]) heldKeys.add(k);
   if (ev.repeat) return; // held movement is driven by the game loop
@@ -1791,21 +1994,44 @@ function fitCanvas() {
   const cvStyle = getComputedStyle(cv), bodyStyle = getComputedStyle(document.body);
   const border = parseFloat(cvStyle.borderLeftWidth) + parseFloat(cvStyle.borderRightWidth);
   const bodyPad = parseFloat(bodyStyle.paddingLeft) + parseFloat(bodyStyle.paddingRight);
-  const avail = Math.min(cv.width, document.documentElement.clientWidth - bodyPad - border);
-  const devicePx = Math.floor((avail * dpr) / cv.width) * cv.width;
-  const crispCss = devicePx / dpr;
-  if (devicePx >= cv.width && crispCss >= CRISP_THRESHOLD * avail) {
+  const avail = Math.max(160, document.documentElement.clientWidth - bodyPad - border);
+  const requested = G.video.windowSize === "fit" ? avail : Math.min(avail, parseInt(G.video.windowSize, 10) || BASE_CANVAS_SIZE);
+  const integerCss = Math.floor((requested * dpr) / BASE_CANVAS_SIZE) * BASE_CANVAS_SIZE / dpr;
+  if (G.video.scaleMode === "smooth") {
+    cv.style.width = requested + "px";
+    cv.style.height = requested + "px";
+    cv.style.imageRendering = "auto";
+  } else if (G.video.scaleMode === "crisp") {
+    const crispCss = integerCss >= BASE_CANVAS_SIZE / dpr ? integerCss : requested;
     cv.style.width = crispCss + "px";
     cv.style.height = crispCss + "px";
     cv.style.imageRendering = "pixelated";
   } else {
-    cv.style.width = avail + "px";
-    cv.style.height = avail + "px";
-    cv.style.imageRendering = "auto";
+    const devicePx = Math.floor((requested * dpr) / BASE_CANVAS_SIZE) * BASE_CANVAS_SIZE;
+    const crispCss = devicePx / dpr;
+    if (devicePx >= BASE_CANVAS_SIZE && crispCss >= CRISP_THRESHOLD * requested) {
+      cv.style.width = crispCss + "px";
+      cv.style.height = crispCss + "px";
+      cv.style.imageRendering = "pixelated";
+    } else {
+      cv.style.width = requested + "px";
+      cv.style.height = requested + "px";
+      cv.style.imageRendering = "auto";
+    }
   }
 }
 window.addEventListener("resize", fitCanvas);
 window.addEventListener("orientationchange", fitCanvas);
+optionsBtn.addEventListener("click", openOptions);
+optionsCloseBtn.addEventListener("click", closeOptions);
+optionsModal.addEventListener("click", (ev) => {
+  if (ev.target === optionsModal) closeOptions();
+});
+windowSizeSel.addEventListener("change", () => setVideoSetting("windowSize", windowSizeSel.value));
+scaleModeSel.addEventListener("change", () => setVideoSetting("scaleMode", scaleModeSel.value));
+scanlinesSel.addEventListener("change", () => setVideoSetting("scanlines", scanlinesSel.value));
+combatFlashSel.addEventListener("change", () => setVideoSetting("combatFlash", combatFlashSel.value));
+syncVideoForm();
 fitCanvas();
 
 (function loop() {
