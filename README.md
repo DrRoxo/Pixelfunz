@@ -4,6 +4,8 @@
 
 No build steps, no dependencies, no external assets — all pixel art is drawn procedurally on canvas. Just open `index.html` in a browser and play.
 
+For a fuller walkthrough of how the game works and how to build/run it, see [`Pixelfunz-Game-Breakdown.pdf`](Pixelfunz-Game-Breakdown.pdf).
+
 ## How to play
 
 1. Open `index.html` in any modern browser.
