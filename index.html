@@ -178,6 +178,7 @@
   }
   body.fullscreen-ui {
     padding: 6px;
+    min-height: 100vh;
     min-height: 100svh;
   }
   body.fullscreen-ui h1 {
@@ -332,11 +333,11 @@ function canFullscreen() {
 function fullscreenElement() {
   return document.fullscreenElement || document.webkitFullscreenElement || null;
 }
-function isFullscreenActive() {
+function isExpandedViewActive() {
   return !!fullscreenElement() || G.pseudoFullscreen;
 }
 function updateFullscreenButtons() {
-  const active = isFullscreenActive();
+  const active = isExpandedViewActive();
   const label = active ? "Exit Fullscreen" : "Fullscreen";
   fullscreenBtn.textContent = active ? "🗗 Exit Fullscreen" : "⛶ Fullscreen";
   touchFullscreenBtn.textContent = active ? "Exit" : "Full";
@@ -2069,7 +2070,7 @@ function updateResponsiveUI() {
   const vw = document.documentElement.clientWidth;
   const vh = document.documentElement.clientHeight;
   const coarse = window.matchMedia("(pointer: coarse)").matches;
-  const activeFullscreen = isFullscreenActive();
+  const activeFullscreen = isExpandedViewActive();
   const compact = vw < 860 || (coarse && vw < 1100) || (activeFullscreen && vw < 1200);
   document.body.classList.toggle("compact-ui", compact);
   document.body.classList.toggle("fullscreen-ui", activeFullscreen);
@@ -2092,7 +2093,7 @@ function fitCanvas() {
   const border = parseFloat(cvStyle.borderLeftWidth) + parseFloat(cvStyle.borderRightWidth);
   const bodyPadX = parseFloat(bodyStyle.paddingLeft) + parseFloat(bodyStyle.paddingRight);
   const bodyPadY = parseFloat(bodyStyle.paddingTop) + parseFloat(bodyStyle.paddingBottom);
-  const activeFullscreen = isFullscreenActive();
+  const activeFullscreen = isExpandedViewActive();
   const coarse = window.matchMedia("(pointer: coarse)").matches;
   const widthAvail = Math.max(160, document.documentElement.clientWidth - bodyPadX - border);
   const reservedHeight = activeFullscreen ? (coarse ? 190 : 90) : 0;
