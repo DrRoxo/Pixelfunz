@@ -2010,7 +2010,7 @@ document.addEventListener("keydown", (ev) => {
     }
     return;
   }
-  if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(k)) ev.preventDefault();
+  if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " ", "Enter"].includes(k)) ev.preventDefault();
   if (MOVE_KEYS[k]) heldKeys.add(k);
   if (ev.repeat) return; // held movement is driven by the game loop
   handleInput(k);
