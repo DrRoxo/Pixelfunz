@@ -2053,6 +2053,7 @@ async function toggleFullscreen() {
   }
   updateFullscreenButtons();
   fitCanvas();
+  cv.focus();
 }
 touchFullscreenBtn.addEventListener("click", toggleFullscreen);
 
